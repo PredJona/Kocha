@@ -15,7 +15,7 @@ from backend.database import (
 
 app = FastAPI(
     title="Kocha - Auditor de Facturación",
-    version="1.4.0"
+    version="1.5.0"
 )
 
 

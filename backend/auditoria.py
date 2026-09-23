@@ -1,3 +1,5 @@
+from collections import Counter
+
 from backend.database import (
     convertir_a_centavos,
     obtener_siniestro,
@@ -7,6 +9,11 @@ from backend.database import (
 
 def auditar_factura(factura):
     inconsistencias = []
+
+    validar_items_duplicados(
+        factura,
+        inconsistencias
+    )
 
     siniestro = obtener_siniestro(
         factura.siniestro_id
@@ -45,6 +52,31 @@ def auditar_factura(factura):
         )
 
     return inconsistencias
+
+
+def validar_items_duplicados(
+    factura,
+    inconsistencias
+):
+    codigos = [
+        item.codigo
+        for item in factura.items
+    ]
+
+    conteo = Counter(codigos)
+
+    for codigo, cantidad in conteo.items():
+
+        if cantidad > 1:
+            inconsistencias.append({
+                "tipo": "ITEM_DUPLICADO",
+                "codigo": codigo,
+                "cantidad_apariciones": cantidad,
+                "mensaje": (
+                    "El ítem aparece más de una vez "
+                    "en la factura."
+                )
+            })
 
 
 def validar_tarifa(
@@ -114,3 +146,4 @@ def validar_item_siniestro(
                 "al siniestro reportado."
             )
         })
+        
