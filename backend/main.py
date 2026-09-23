@@ -4,12 +4,17 @@ from decimal import Decimal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.database import crear_tablas, guardar_factura
+from backend.auditoria import auditar_factura
+from backend.database import (
+    crear_tablas,
+    guardar_factura,
+    listar_tarifas,
+)
 
 
 app = FastAPI(
     title="Kocha - Auditor de Facturación",
-    version="1.2.0"
+    version="1.3.0"
 )
 
 crear_tablas()
@@ -33,7 +38,7 @@ class Factura(BaseModel):
 def inicio():
     return {
         "mensaje": "Backend del Reto 2 funcionando",
-        "version": "1.2"
+        "version": "1.3"
     }
 
 
@@ -53,3 +58,25 @@ def recibir_factura(factura: Factura):
             status_code=409,
             detail="La factura ya fue registrada anteriormente"
         )
+
+
+@app.get("/tarifas")
+def obtener_tarifas():
+    return listar_tarifas()
+
+
+@app.post("/auditar")
+def auditar(factura: Factura):
+    inconsistencias = auditar_factura(factura)
+
+    if inconsistencias:
+        estado = "CON_INCONSISTENCIAS"
+    else:
+        estado = "CORRECTA"
+
+    return {
+        "factura": factura.numero,
+        "estado": estado,
+        "cantidad_inconsistencias": len(inconsistencias),
+        "inconsistencias": inconsistencias
+    }
