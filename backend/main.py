@@ -7,15 +7,18 @@ from pydantic import BaseModel, Field
 from backend.auditoria import auditar_factura
 from backend.database import (
     crear_tablas,
+    guardar_auditoria,
     guardar_factura,
+    listar_auditorias,
     listar_tarifas,
+    obtener_auditoria,
     obtener_siniestro,
 )
 
 
 app = FastAPI(
     title="Kocha - Auditor de Facturación",
-    version="1.5.0"
+    version="1.6.0"
 )
 
 
@@ -25,12 +28,8 @@ crear_tablas()
 class ItemFactura(BaseModel):
     codigo: str
     descripcion: str
-    cantidad: int = Field(
-        gt=0
-    )
-    precio_unitario: Decimal = Field(
-        gt=0
-    )
+    cantidad: int = Field(gt=0)
+    precio_unitario: Decimal = Field(gt=0)
 
 
 class Factura(BaseModel):
@@ -46,7 +45,7 @@ def inicio():
         "mensaje": (
             "Backend del Reto 2 funcionando"
         ),
-        "version": "1.4"
+        "version": "1.6"
     }
 
 
@@ -111,11 +110,17 @@ def auditar(
 
     if inconsistencias:
         estado = "CON_INCONSISTENCIAS"
-
     else:
         estado = "CORRECTA"
 
+    auditoria_id = guardar_auditoria(
+        factura,
+        estado,
+        inconsistencias
+    )
+
     return {
+        "auditoria_id": auditoria_id,
         "factura": factura.numero,
         "estado": estado,
         "cantidad_inconsistencias": (
@@ -123,3 +128,27 @@ def auditar(
         ),
         "inconsistencias": inconsistencias
     }
+
+
+@app.get("/auditorias")
+def consultar_auditorias():
+    return listar_auditorias()
+
+
+@app.get(
+    "/auditorias/{auditoria_id}"
+)
+def consultar_auditoria(
+    auditoria_id: int
+):
+    auditoria = obtener_auditoria(
+        auditoria_id
+    )
+
+    if auditoria is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Auditoría no encontrada"
+        )
+
+    return auditoria

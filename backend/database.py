@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -108,7 +109,6 @@ def crear_tablas():
             )
         """)
 
-        # Siniestro de prueba
         cursor.execute("""
             INSERT OR IGNORE INTO siniestros (
                 id,
@@ -122,7 +122,6 @@ def crear_tablas():
             "Daño frontal del vehículo"
         ))
 
-        # Ítems autorizados para SIN-001
         cursor.executemany("""
             INSERT OR IGNORE INTO items_siniestro (
                 siniestro_id,
@@ -140,22 +139,30 @@ def crear_tablas():
             )
         ])
 
+        # -------------------------
+        # Historial de auditorías
+        # -------------------------
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS auditorias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                factura_numero TEXT NOT NULL,
+                siniestro_id TEXT NOT NULL,
+                taller TEXT NOT NULL,
+                estado TEXT NOT NULL,
+                cantidad_inconsistencias INTEGER NOT NULL,
+                inconsistencias TEXT NOT NULL,
+                fecha_creacion TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
 
 def convertir_a_centavos(precio: Decimal) -> int:
-    """
-    Convierte dólares a centavos.
-
-    Ejemplo:
-    350.00 -> 35000
-    """
     return int(precio * 100)
 
 
 def guardar_factura(factura):
-    """
-    Guarda una factura y todos sus ítems.
-    """
-
     with conectar() as conexion:
         cursor = conexion.cursor()
 
@@ -204,10 +211,6 @@ def guardar_factura(factura):
 
 
 def obtener_tarifa(codigo):
-    """
-    Busca un ítem dentro del tarifario.
-    """
-
     with conectar() as conexion:
         conexion.row_factory = sqlite3.Row
         cursor = conexion.cursor()
@@ -233,10 +236,6 @@ def obtener_tarifa(codigo):
 
 
 def listar_tarifas():
-    """
-    Devuelve todas las tarifas.
-    """
-
     with conectar() as conexion:
         conexion.row_factory = sqlite3.Row
         cursor = conexion.cursor()
@@ -259,11 +258,6 @@ def listar_tarifas():
 
 
 def obtener_siniestro(siniestro_id):
-    """
-    Busca un siniestro y devuelve
-    sus ítems autorizados.
-    """
-
     with conectar() as conexion:
         conexion.row_factory = sqlite3.Row
         cursor = conexion.cursor()
@@ -305,3 +299,124 @@ def obtener_siniestro(siniestro_id):
         ]
 
         return resultado
+
+
+def guardar_auditoria(
+    factura,
+    estado,
+    inconsistencias
+):
+    """
+    Guarda el resultado completo de una auditoría.
+    """
+
+    inconsistencias_json = json.dumps(
+        inconsistencias,
+        ensure_ascii=False
+    )
+
+    with conectar() as conexion:
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO auditorias (
+                factura_numero,
+                siniestro_id,
+                taller,
+                estado,
+                cantidad_inconsistencias,
+                inconsistencias
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                factura.numero,
+                factura.siniestro_id,
+                factura.taller,
+                estado,
+                len(inconsistencias),
+                inconsistencias_json
+            )
+        )
+
+        return cursor.lastrowid
+
+
+def listar_auditorias():
+    """
+    Devuelve el historial de auditorías.
+    """
+
+    with conectar() as conexion:
+        conexion.row_factory = sqlite3.Row
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT
+                id,
+                factura_numero,
+                siniestro_id,
+                taller,
+                estado,
+                cantidad_inconsistencias,
+                inconsistencias,
+                fecha_creacion
+            FROM auditorias
+            ORDER BY id DESC
+        """)
+
+        filas = cursor.fetchall()
+
+        auditorias = []
+
+        for fila in filas:
+            auditoria = dict(fila)
+
+            auditoria["inconsistencias"] = json.loads(
+                auditoria["inconsistencias"]
+            )
+
+            auditorias.append(auditoria)
+
+        return auditorias
+
+
+def obtener_auditoria(auditoria_id):
+    """
+    Busca una auditoría por su ID.
+    """
+
+    with conectar() as conexion:
+        conexion.row_factory = sqlite3.Row
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                factura_numero,
+                siniestro_id,
+                taller,
+                estado,
+                cantidad_inconsistencias,
+                inconsistencias,
+                fecha_creacion
+            FROM auditorias
+            WHERE id = ?
+            """,
+            (auditoria_id,)
+        )
+
+        fila = cursor.fetchone()
+
+        if fila is None:
+            return None
+
+        auditoria = dict(fila)
+
+        auditoria["inconsistencias"] = json.loads(
+            auditoria["inconsistencias"]
+        )
+
+        return auditoria
