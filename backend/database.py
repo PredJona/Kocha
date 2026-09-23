@@ -3,27 +3,23 @@ from decimal import Decimal
 from pathlib import Path
 
 
-# La base de datos se guardará dentro de la carpeta backend
 DATABASE_PATH = Path(__file__).parent / "auditoria.db"
 
 
 def conectar():
-    """
-    Crea una conexión con la base de datos SQLite.
-    """
-    return sqlite3.connect(DATABASE_PATH)
+    conexion = sqlite3.connect(DATABASE_PATH)
+    conexion.execute("PRAGMA foreign_keys = ON")
+    return conexion
 
 
 def crear_tablas():
-    """
-    Crea las tablas necesarias para el sistema
-    si todavía no existen.
-    """
-
     with conectar() as conexion:
         cursor = conexion.cursor()
 
-        # Tabla principal de facturas
+        # -------------------------
+        # Facturas
+        # -------------------------
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS facturas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +29,6 @@ def crear_tablas():
             )
         """)
 
-        # Ítems que pertenecen a cada factura
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS items_factura (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,12 +37,16 @@ def crear_tablas():
                 descripcion TEXT NOT NULL,
                 cantidad INTEGER NOT NULL,
                 precio_unitario_centavos INTEGER NOT NULL,
+
                 FOREIGN KEY (factura_id)
                     REFERENCES facturas(id)
             )
         """)
 
-        # Tarifario acordado con los talleres
+        # -------------------------
+        # Tarifario
+        # -------------------------
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tarifas (
                 codigo TEXT PRIMARY KEY,
@@ -56,7 +55,6 @@ def crear_tablas():
             )
         """)
 
-        # Datos ficticios para nuestro MVP
         cursor.executemany("""
             INSERT OR IGNORE INTO tarifas (
                 codigo,
@@ -82,10 +80,70 @@ def crear_tablas():
             )
         ])
 
+        # -------------------------
+        # Siniestros
+        # -------------------------
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS siniestros (
+                id TEXT PRIMARY KEY,
+                placa TEXT NOT NULL,
+                descripcion_dano TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS items_siniestro (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                siniestro_id TEXT NOT NULL,
+                codigo_item TEXT NOT NULL,
+
+                FOREIGN KEY (siniestro_id)
+                    REFERENCES siniestros(id),
+
+                UNIQUE (
+                    siniestro_id,
+                    codigo_item
+                )
+            )
+        """)
+
+        # Siniestro de prueba
+        cursor.execute("""
+            INSERT OR IGNORE INTO siniestros (
+                id,
+                placa,
+                descripcion_dano
+            )
+            VALUES (?, ?, ?)
+        """, (
+            "SIN-001",
+            "ABC123",
+            "Daño frontal del vehículo"
+        ))
+
+        # Ítems autorizados para SIN-001
+        cursor.executemany("""
+            INSERT OR IGNORE INTO items_siniestro (
+                siniestro_id,
+                codigo_item
+            )
+            VALUES (?, ?)
+        """, [
+            (
+                "SIN-001",
+                "REP-001"
+            ),
+            (
+                "SIN-001",
+                "MAN-001"
+            )
+        ])
+
 
 def convertir_a_centavos(precio: Decimal) -> int:
     """
-    Convierte un precio en dólares a centavos.
+    Convierte dólares a centavos.
 
     Ejemplo:
     350.00 -> 35000
@@ -95,8 +153,7 @@ def convertir_a_centavos(precio: Decimal) -> int:
 
 def guardar_factura(factura):
     """
-    Guarda una factura y todos sus ítems
-    dentro de SQLite.
+    Guarda una factura y todos sus ítems.
     """
 
     with conectar() as conexion:
@@ -148,13 +205,11 @@ def guardar_factura(factura):
 
 def obtener_tarifa(codigo):
     """
-    Busca una tarifa utilizando el código
-    del repuesto o servicio.
+    Busca un ítem dentro del tarifario.
     """
 
     with conectar() as conexion:
         conexion.row_factory = sqlite3.Row
-
         cursor = conexion.cursor()
 
         cursor.execute(
@@ -179,12 +234,11 @@ def obtener_tarifa(codigo):
 
 def listar_tarifas():
     """
-    Devuelve todas las tarifas registradas.
+    Devuelve todas las tarifas.
     """
 
     with conectar() as conexion:
         conexion.row_factory = sqlite3.Row
-
         cursor = conexion.cursor()
 
         cursor.execute("""
@@ -202,3 +256,52 @@ def listar_tarifas():
             dict(tarifa)
             for tarifa in tarifas
         ]
+
+
+def obtener_siniestro(siniestro_id):
+    """
+    Busca un siniestro y devuelve
+    sus ítems autorizados.
+    """
+
+    with conectar() as conexion:
+        conexion.row_factory = sqlite3.Row
+        cursor = conexion.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                placa,
+                descripcion_dano
+            FROM siniestros
+            WHERE id = ?
+            """,
+            (siniestro_id,)
+        )
+
+        siniestro = cursor.fetchone()
+
+        if siniestro is None:
+            return None
+
+        cursor.execute(
+            """
+            SELECT codigo_item
+            FROM items_siniestro
+            WHERE siniestro_id = ?
+            ORDER BY codigo_item
+            """,
+            (siniestro_id,)
+        )
+
+        items = cursor.fetchall()
+
+        resultado = dict(siniestro)
+
+        resultado["items_autorizados"] = [
+            item["codigo_item"]
+            for item in items
+        ]
+
+        return resultado
