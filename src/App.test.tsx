@@ -5,7 +5,7 @@ import App from './App'
 describe('ClaimGuard UI', () => {
   it('muestra el formulario de auditoría inicial', () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Datos de la factura' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Iniciar auditoría/i })).toBeTruthy()
+    expect(screen.getByText('Hola, soy ClaimGuard.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Enviar/i })).toBeTruthy()
   })
 })
