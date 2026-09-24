@@ -2,6 +2,7 @@ import sqlite3
 from decimal import Decimal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from backend.auditoria import auditar_factura
@@ -18,26 +19,81 @@ from backend.database import (
 
 app = FastAPI(
     title="Kocha - Auditor de Facturación",
-    version="1.7.0"
+    description=(
+        "API para auditar facturas de talleres contra "
+        "tarifarios y siniestros reportados."
+    ),
+    version="1.8.0"
 )
 
 
+# --------------------------------------------------
+# CORS
+# Permite que el frontend pueda comunicarse
+# con el backend durante el desarrollo.
+# --------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Crear las tablas al iniciar la aplicación
 crear_tablas()
 
 
+# --------------------------------------------------
+# Modelos
+# --------------------------------------------------
+
 class ItemFactura(BaseModel):
-    codigo: str
-    descripcion: str
-    cantidad: int = Field(gt=0)
-    precio_unitario: Decimal = Field(gt=0)
+    codigo: str = Field(
+        min_length=1
+    )
+
+    descripcion: str = Field(
+        min_length=1
+    )
+
+    cantidad: int = Field(
+        gt=0
+    )
+
+    precio_unitario: Decimal = Field(
+        gt=0
+    )
 
 
 class Factura(BaseModel):
-    numero: str
-    siniestro_id: str
-    taller: str
-    items: list[ItemFactura]
+    numero: str = Field(
+        min_length=1
+    )
 
+    siniestro_id: str = Field(
+        min_length=1
+    )
+
+    taller: str = Field(
+        min_length=1
+    )
+
+    items: list[ItemFactura] = Field(
+        min_length=1
+    )
+
+
+# --------------------------------------------------
+# Estado del backend
+# --------------------------------------------------
 
 @app.get("/")
 def inicio():
@@ -45,9 +101,13 @@ def inicio():
         "mensaje": (
             "Backend del Reto 2 funcionando"
         ),
-        "version": "1.7"
+        "version": "1.8"
     }
 
+
+# --------------------------------------------------
+# Facturas
+# --------------------------------------------------
 
 @app.post("/facturas")
 def recibir_factura(
@@ -76,10 +136,18 @@ def recibir_factura(
         )
 
 
+# --------------------------------------------------
+# Tarifario
+# --------------------------------------------------
+
 @app.get("/tarifas")
 def obtener_tarifas():
     return listar_tarifas()
 
+
+# --------------------------------------------------
+# Siniestros
+# --------------------------------------------------
 
 @app.get(
     "/siniestros/{siniestro_id}"
@@ -99,6 +167,10 @@ def consultar_siniestro(
 
     return siniestro
 
+
+# --------------------------------------------------
+# Auditoría
+# --------------------------------------------------
 
 @app.post("/auditar")
 def auditar(
@@ -129,6 +201,10 @@ def auditar(
         "inconsistencias": inconsistencias
     }
 
+
+# --------------------------------------------------
+# Historial de auditorías
+# --------------------------------------------------
 
 @app.get("/auditorias")
 def consultar_auditorias():

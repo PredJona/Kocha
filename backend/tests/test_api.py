@@ -9,8 +9,13 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def base_datos_temporal(tmp_path, monkeypatch):
-    ruta_temporal = tmp_path / "test_api.db"
+def base_datos_temporal(
+    tmp_path,
+    monkeypatch
+):
+    ruta_temporal = (
+        tmp_path / "test_api.db"
+    )
 
     monkeypatch.setattr(
         database,
@@ -25,14 +30,22 @@ def test_inicio():
     respuesta = client.get("/")
 
     assert respuesta.status_code == 200
-    assert respuesta.json()["version"] == "1.7"
+
+    datos = respuesta.json()
+
+    assert datos["version"] == "1.8"
 
 
 def test_obtener_tarifas():
-    respuesta = client.get("/tarifas")
+    respuesta = client.get(
+        "/tarifas"
+    )
 
     assert respuesta.status_code == 200
-    assert len(respuesta.json()) == 3
+
+    tarifas = respuesta.json()
+
+    assert len(tarifas) == 3
 
 
 def test_consultar_siniestro():
@@ -45,7 +58,11 @@ def test_consultar_siniestro():
     datos = respuesta.json()
 
     assert datos["id"] == "SIN-001"
-    assert "REP-001" in datos["items_autorizados"]
+
+    assert (
+        "REP-001"
+        in datos["items_autorizados"]
+    )
 
 
 def test_auditar_factura():
@@ -56,7 +73,9 @@ def test_auditar_factura():
         "items": [
             {
                 "codigo": "REP-001",
-                "descripcion": "Parachoques delantero",
+                "descripcion": (
+                    "Parachoques delantero"
+                ),
                 "cantidad": 1,
                 "precio_unitario": 350
             }
@@ -76,10 +95,12 @@ def test_auditar_factura():
         "CON_INCONSISTENCIAS"
     )
 
-    assert resultado[
-        "cantidad_inconsistencias"
-    ] == 1
+    assert (
+        resultado["cantidad_inconsistencias"]
+        == 1
+    )
 
-    assert resultado[
-        "inconsistencias"
-    ][0]["tipo"] == "PRECIO_SUPERA_TARIFA"
+    assert (
+        resultado["inconsistencias"][0]["tipo"]
+        == "PRECIO_SUPERA_TARIFA"
+    )
