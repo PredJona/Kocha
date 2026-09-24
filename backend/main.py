@@ -1,8 +1,6 @@
 import sqlite3
-from decimal import Decimal
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 
 from backend.auditoria import auditar_factura
 from backend.database import (
@@ -11,6 +9,7 @@ from backend.database import (
     listar_tarifas,
     obtener_siniestro,
 )
+from backend.schemas import Factura, ItemFactura
 
 
 app = FastAPI(
@@ -20,24 +19,6 @@ app = FastAPI(
 
 
 crear_tablas()
-
-
-class ItemFactura(BaseModel):
-    codigo: str
-    descripcion: str
-    cantidad: int = Field(
-        gt=0
-    )
-    precio_unitario: Decimal = Field(
-        gt=0
-    )
-
-
-class Factura(BaseModel):
-    numero: str
-    siniestro_id: str
-    taller: str
-    items: list[ItemFactura]
 
 
 @app.get("/")
