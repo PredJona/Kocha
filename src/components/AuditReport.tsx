@@ -1,0 +1,11 @@
+import type { AuditResponse, Finding } from '../types/audit'
+import { Icon } from './Icon'
+
+const labels: Record<string, string> = { ITEM_DUPLICADO: 'Posible duplicado', PRECIO_SUPERA_TARIFA: 'Tarifa excedida', ITEM_SIN_TARIFA: 'Referencia faltante', ITEM_NO_CORRESPONDE_SINIESTRO: 'Revisión de cobertura', SINIESTRO_NO_ENCONTRADO: 'Siniestro no encontrado' }
+function FindingCard({ finding, index }: { finding: Finding; index: number }) {
+  return <article className="finding" style={{ animationDelay: `${index * 75}ms` }}><div className="finding-icon"><Icon name="alert" size={18} /></div><div><div className="finding-title"><span>{labels[finding.tipo] ?? finding.tipo}</span>{finding.codigo && <code>{finding.codigo}</code>}</div><p>{finding.mensaje}</p>{finding.precio_facturado && <div className="evidence"><span>Facturado <b>${finding.precio_facturado}</b></span><span>Tarifa <b>${finding.precio_maximo}</b></span></div>}{finding.cantidad_apariciones && <small>{finding.cantidad_apariciones} apariciones encontradas en esta factura.</small>}</div></article>
+}
+export function AuditReport({ report, onReset }: { report: AuditResponse; onReset: () => void }) {
+  const clear = report.estado === 'CORRECTA'
+  return <section className="report-panel" aria-live="polite"><div className={`outcome ${clear ? 'outcome-clear' : ''}`}><div className="outcome-icon"><Icon name={clear ? 'check' : 'alert'} size={24} /></div><div><span className="eyebrow">Informe de auditoría</span><h2>{clear ? 'Sin observaciones relevantes' : 'Requiere revisión humana'}</h2><p>Factura {report.factura} · {report.cantidad_inconsistencias} {report.cantidad_inconsistencias === 1 ? 'hallazgo' : 'hallazgos'}</p></div><button className="icon-button" onClick={onReset} aria-label="Iniciar otra auditoría"><Icon name="refresh" /></button></div>{clear ? <div className="clear-card"><Icon name="shield" size={28} /><p>Los conceptos coinciden con el tarifario y el siniestro seleccionado.</p></div> : <div className="findings">{report.inconsistencias.map((finding, index) => <FindingCard key={`${finding.tipo}-${finding.codigo ?? index}`} finding={finding} index={index} />)}</div>}<p className="human-note"><Icon name="sparkle" size={16} /> Los hallazgos orientan la revisión; no constituyen una decisión de pago ni una acusación de fraude.</p></section>
+}
