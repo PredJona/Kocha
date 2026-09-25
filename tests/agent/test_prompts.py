@@ -62,6 +62,8 @@ def test_system_prompt_sets_decision_and_safety_boundaries() -> None:
         "pagos",
         "fraude",
         "revisión humana",
+        "moneda",
+        "unidades",
     ):
         assert required in prompt
 
