@@ -1,8 +1,11 @@
 import sqlite3
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 
 from backend.auditoria import auditar_factura
+from backend.agent.factory import get_agent_orchestrator
+from backend.agent.orchestrator import AgentOrchestrator
+from backend.agent.schemas import AgentRequest, AgentResponse
 from backend.database import (
     crear_tablas,
     guardar_factura,
@@ -104,3 +107,11 @@ def auditar(
         ),
         "inconsistencias": inconsistencias
     }
+
+
+@app.post("/agent", response_model=AgentResponse)
+def ejecutar_agente(
+    request: AgentRequest,
+    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
+) -> AgentResponse:
+    return orchestrator.run(request)
