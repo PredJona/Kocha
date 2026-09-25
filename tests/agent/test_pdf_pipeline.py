@@ -6,7 +6,6 @@ from backend.agent.errors import AgentExecutionError
 from backend.agent.extractors.invoice_extractor import InvoiceExtractor
 from backend.agent.orchestrator import AgentOrchestrator
 from backend.agent.pdf_pipeline import run_pdf_agent
-from backend.agent.schemas import FinalDecision, ToolDecision
 from backend.agent.tools.defaults import build_default_registry
 from pdf_fixture import make_blank_pdf, make_text_pdf
 
@@ -34,7 +33,6 @@ def run(data, fake):
 def test_pdf_pipeline_audits_extracted_invoice(invoice_data, temporary_database):
     fake = FakeChat(
         invoice_data,
-        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": invoice_data}},
         {"type": "final_answer", "message": "Revisión completada."},
     )
 
@@ -44,11 +42,11 @@ def test_pdf_pipeline_audits_extracted_invoice(invoice_data, temporary_database)
     assert result.invoice.numero == "FAC-001"
     assert result.audit["estado"] == "CORRECTA"
     assert [step.type for step in result.steps] == [
-        "pdf_text_extracted", "invoice_extracted", "invoice_validated", "model_call",
-        "tool_call", "model_call", "response_generated",
+        "pdf_text_extracted", "invoice_extracted", "invoice_validated", "tool_call",
+        "model_call", "response_generated",
     ]
     assert all(step.status == "completed" for step in result.steps)
-    assert fake.calls == 3
+    assert fake.calls == 2
 
 
 def test_pdf_pipeline_detects_an_over_tariff_item(invoice_data, temporary_database):
@@ -58,7 +56,6 @@ def test_pdf_pipeline_detects_an_over_tariff_item(invoice_data, temporary_databa
     }
     fake = FakeChat(
         over_tariff_invoice,
-        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": over_tariff_invoice}},
         {"type": "final_answer", "message": "Se detectó una posible inconsistencia tarifaria."},
     )
 

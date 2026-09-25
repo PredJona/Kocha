@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 @dataclass(frozen=True)
 class AgentSettings:
     host: str = "http://127.0.0.1:11434"
-    model: str = "qwen2.5:3b"
+    model: str = "qwen3:4b-instruct"
     timeout: float = 120.0
 
     def __post_init__(self) -> None:

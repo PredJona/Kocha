@@ -10,7 +10,7 @@ def test_settings_use_development_defaults(monkeypatch):
     settings = AgentSettings.from_env()
 
     assert settings.host == "http://127.0.0.1:11434"
-    assert settings.model == "qwen2.5:3b"
+    assert settings.model == "qwen3:4b-instruct"
     assert settings.timeout == 120.0
 
 

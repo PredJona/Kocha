@@ -41,6 +41,7 @@ def test_chat_sends_schema_and_returns_root_model():
         "messages": [{"role": "user", "content": "Review invoice"}],
         "stream": False,
         "format": AgentDecision.model_json_schema(),
+        "options": {"temperature": 0},
     }
 
 

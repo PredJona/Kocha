@@ -38,11 +38,17 @@ python3.12 -m venv .venv
 npm ci
 ```
 
-Inicia Ollama con `ollama serve` si aún no está ejecutándose. Instala un modelo local compatible con salida JSON estructurada, por ejemplo `ollama pull qwen2.5:3b`. El modelo se elige con variables de entorno; no hace falta cambiar código:
+Inicia Ollama con `ollama serve` si aún no está ejecutándose. Para el entorno de demo de 16 GB de RAM usa `qwen3:4b-instruct`, que también es el valor predeterminado del proyecto:
+
+```bash
+ollama pull qwen3:4b-instruct
+```
+
+El modelo se elige con variables de entorno; no hace falta cambiar código:
 
 ```bash
 export OLLAMA_HOST=http://127.0.0.1:11434
-export OLLAMA_MODEL=qwen2.5:3b
+export OLLAMA_MODEL=qwen3:4b-instruct
 export OLLAMA_TIMEOUT=120
 .venv/bin/uvicorn backend.main:app --reload
 ```
@@ -59,7 +65,7 @@ Para una factura PDF pequeña que contenga texto seleccionable:
 curl -F file=@invoice.pdf -F 'prompt=Audita esta factura' http://127.0.0.1:8000/agent/pdf
 ```
 
-`/agent/pdf` acepta PDFs de hasta 5 MiB y 20 páginas, extrae como máximo 30 000 caracteres, valida los campos obtenidos y ejecuta la misma auditoría del agente JSON. Requiere texto incrustado: no hace OCR de imágenes o escaneos. Los errores de lectura y extracción devuelven un resultado controlado sin ejecutar la auditoría.
+`/agent/pdf` acepta PDFs de hasta 5 MiB y 20 páginas, extrae como máximo 30 000 caracteres, valida los campos obtenidos y ejecuta la misma auditoría del agente JSON. Las facturas de reparación con tabla se normalizan localmente antes de consultar el modelo; otros formatos usan el modelo como respaldo. Cuando el prompt solicita una auditoría, el orquestador ejecuta `audit_invoice` con la factura validada y después pide al modelo que explique el resultado. Requiere texto incrustado: no hace OCR de imágenes o escaneos. Los errores de lectura y extracción devuelven un resultado controlado sin ejecutar la auditoría.
 
 La respuesta incluye la explicación, los resultados obtenidos y una lista de pasos ejecutados por el backend. El agente presenta hallazgos para revisión humana; no aprueba pagos ni declara fraude.
 
@@ -73,8 +79,8 @@ Las pruebas automatizadas y CI sustituyen únicamente el límite externo de Olla
 
 ## Flujo disponible hoy
 
-1. Selecciona el siniestro sintético `SIN-001`.
-2. Usa la factura JSON de ejemplo o adjunta una factura JSON o PDF con texto seleccionable.
+1. Adjunta una factura JSON o PDF con texto seleccionable. La demo incluye datos sintéticos para `SIN-001` y `CLM-2026-002`.
+2. Pide a Kocha que audite la factura.
 3. Ejecuta la auditoría y revisa cargos duplicados, conceptos fuera del
    siniestro y precios superiores a la tarifa.
 

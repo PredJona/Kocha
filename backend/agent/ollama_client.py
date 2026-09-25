@@ -89,6 +89,7 @@ class OllamaClient:
                     "messages": messages,
                     "stream": False,
                     "format": schema,
+                    "options": {"temperature": 0},
                 },
                 timeout=self.settings.timeout,
             )

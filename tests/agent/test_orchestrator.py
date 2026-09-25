@@ -149,34 +149,20 @@ def test_equivalent_numeric_invoice_price_is_bound_to_original_facts(invoice_dat
     assert response.audit["factura"] == "FAC-001"
 
 
-def test_explicit_audit_prompt_corrects_early_final_then_allows_successful_audit(
+def test_explicit_audit_runs_the_trusted_invoice_before_the_first_model_call(
     invoice_data, temporary_database
 ):
-    prompt = "Audita esta factura usando audit_invoice y explica los hallazgos."
-    client = QueuedChatClient(
-        final("Ya audité la factura."),
-        tool("audit_invoice", {"invoice": invoice_data}),
-        final("La auditoría determinista no encontró inconsistencias."),
-    )
+    client = QueuedChatClient(final("La auditoría determinista no encontró inconsistencias."))
 
-    response = run_with(client, invoice_data, temporary_database, prompt)
+    response = run_with(client, invoice_data, temporary_database, "Audita esta factura")
 
     assert response.status == "completed"
     assert response.audit["factura"] == "FAC-001"
     assert [result.tool for result in response.tool_results] == ["audit_invoice"]
-    assert len(client.calls) == 3
-    assert client.calls[0][1] is ToolDecision
-    assert client.calls[1][1] is ToolDecision
-    assert client.calls[2][1] is AgentDecision
-    reminder = next(
-        message.content
-        for message in client.calls[1][0]
-        if "La solicitud requiere una auditoría" in message.content
-    )
-    assert "audit_invoice" in reminder
-    assert "factura original" in reminder
-    assert [step.type for step in response.steps].count("model_call") == 3
-    assert response.steps[-1].type == "response_generated"
+    assert len(client.calls) == 1
+    assert [step.type for step in response.steps] == [
+        "invoice_validated", "tool_call", "model_call", "response_generated"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -192,25 +178,23 @@ def test_explicit_audit_prompt_corrects_early_final_then_allows_successful_audit
         "Solicito una revisión de la factura.",
     ],
 )
-def test_explicit_audit_prompt_fails_after_one_reminder_if_model_finalizes_again(
+def test_explicit_audit_phrasings_do_not_depend_on_model_tool_selection(
     invoice_data, temporary_database, prompt
 ):
-    client = QueuedChatClient(final("La auditoría salió bien."), final("La factura está correcta."))
+    client = QueuedChatClient(final("La auditoría salió bien."))
 
     response = run_with(client, invoice_data, temporary_database, prompt)
 
-    assert response.status == "failed"
-    assert response.error.code == "audit_not_performed"
-    assert response.audit is None
-    assert len(client.calls) == 2
-    assert "audit_invoice" in client.calls[1][0][-1].content
+    assert response.status == "completed"
+    assert response.audit["factura"] == "FAC-001"
+    assert len(client.calls) == 1
+    assert client.calls[0][1] is AgentDecision
     assert [step.type for step in response.steps] == [
-        "invoice_validated", "model_call", "model_call", "error"
+        "invoice_validated", "tool_call", "model_call", "response_generated"
     ]
-    assert response.steps[-2].status == "completed"
 
 
-def test_explicit_audit_prompt_fails_if_audit_tool_errors_then_model_finalizes(
+def test_model_cannot_replace_the_trusted_audit_with_a_modified_invoice(
     invoice_data, temporary_database
 ):
     modified_invoice = {**invoice_data, "taller": "Taller distinto"}
@@ -222,11 +206,10 @@ def test_explicit_audit_prompt_fails_if_audit_tool_errors_then_model_finalizes(
 
     response = run_with(client, invoice_data, temporary_database, prompt)
 
-    assert response.status == "failed"
-    assert response.error.code == "audit_not_performed"
-    assert response.audit is None
-    assert response.tool_results[0].error.code == "invalid_arguments"
-    assert "audit_invoice" in client.calls[1][0][-1].content
+    assert response.status == "completed"
+    assert response.audit["factura"] == "FAC-001"
+    assert [result.status for result in response.tool_results] == ["success", "error"]
+    assert response.tool_results[1].error.code == "invalid_arguments"
 
 
 @pytest.mark.parametrize(

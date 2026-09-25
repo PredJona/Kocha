@@ -12,7 +12,6 @@ SOURCE = "Factura FAC-001 Siniestro SIN-001 Taller Taller Norte REP-001 Parachoq
 def test_pdf_endpoint_runs_real_audit(invoice_data, temporary_database, monkeypatch):
     responses = iter([
         invoice_data,
-        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": invoice_data}},
         {"type": "final_answer", "message": "Revisión completada."},
     ])
 
@@ -223,7 +222,6 @@ def test_pdf_endpoint_runs_pipeline_in_worker_thread(invoice_data, temporary_dat
 
     responses = iter([
         invoice_data,
-        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": invoice_data}},
         {"type": "final_answer", "message": "Revisión completada."},
     ])
 

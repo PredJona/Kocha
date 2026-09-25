@@ -3,7 +3,7 @@ from collections import deque
 from fastapi.testclient import TestClient
 
 from backend.agent.errors import AgentExecutionError
-from backend.agent.schemas import AgentDecision, FinalDecision, ToolDecision
+from backend.agent.schemas import AgentDecision, FinalDecision
 from backend.agent.tools.defaults import build_default_registry
 
 
@@ -24,10 +24,6 @@ def final(text):
     return AgentDecision(root=FinalDecision(type="final_answer", message=text))
 
 
-def tool(name, arguments):
-    return AgentDecision(root=ToolDecision(type="tool_call", name=name, arguments=arguments))
-
-
 def make_client(fake, temporary_database):
     from backend.agent.factory import get_agent_orchestrator
     from backend.agent.orchestrator import AgentOrchestrator
@@ -39,7 +35,6 @@ def make_client(fake, temporary_database):
 
 def test_agent_endpoint_executes_real_audit_and_returns_trace(invoice_data, temporary_database):
     fake = FakeChat(
-        tool("audit_invoice", {"invoice": invoice_data}),
         final("Se encontró un hallazgo para revisión humana."),
     )
     app, client = make_client(fake, temporary_database)
@@ -55,10 +50,10 @@ def test_agent_endpoint_executes_real_audit_and_returns_trace(invoice_data, temp
     assert body["audit"]["estado"] == "CORRECTA"
     assert body["audit"]["cantidad_inconsistencias"] == 0
     assert [step["type"] for step in body["steps"]] == [
-        "invoice_validated", "model_call", "tool_call", "model_call", "response_generated"
+        "invoice_validated", "tool_call", "model_call", "response_generated"
     ]
     assert body["tool_results"][0]["tool"] == "audit_invoice"
-    assert fake.calls == 2
+    assert fake.calls == 1
 
 
 def test_invalid_invoice_never_calls_model(invoice_data, temporary_database):

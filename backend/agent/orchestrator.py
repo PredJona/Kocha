@@ -64,29 +64,36 @@ class AgentOrchestrator:
             audit_reminded = False
 
             while True:
-                model_step = AgentStep(
-                    type="model_call",
-                    status="running",
-                    message="Consultando al modelo.",
-                )
-                steps.append(model_step)
-                try:
-                    response_model = (
-                        ToolDecision if audit_required and audit is None else AgentDecision
+                if audit_required and audit is None and tool_steps == 0:
+                    decision = ToolDecision(
+                        type="tool_call",
+                        name="audit_invoice",
+                        arguments={"invoice": request.invoice.model_dump(mode="json")},
                     )
-                    decision_response = self.client.chat(messages, response_model)
-                except Exception:
-                    steps[-1] = model_step.model_copy(update={"status": "failed"})
-                    raise
-                steps[-1] = model_step.model_copy(
-                    update={"status": "completed", "message": "El modelo respondió."}
-                )
+                else:
+                    model_step = AgentStep(
+                        type="model_call",
+                        status="running",
+                        message="Consultando al modelo.",
+                    )
+                    steps.append(model_step)
+                    try:
+                        response_model = (
+                            ToolDecision if audit_required and audit is None else AgentDecision
+                        )
+                        decision_response = self.client.chat(messages, response_model)
+                    except Exception:
+                        steps[-1] = model_step.model_copy(update={"status": "failed"})
+                        raise
+                    steps[-1] = model_step.model_copy(
+                        update={"status": "completed", "message": "El modelo respondió."}
+                    )
 
-                decision = (
-                    decision_response.root
-                    if isinstance(decision_response, AgentDecision)
-                    else decision_response
-                )
+                    decision = (
+                        decision_response.root
+                        if isinstance(decision_response, AgentDecision)
+                        else decision_response
+                    )
                 if isinstance(decision, FinalDecision):
                     if audit_required and audit is None:
                         if not audit_reminded:
