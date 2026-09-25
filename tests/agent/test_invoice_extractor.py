@@ -5,6 +5,7 @@ import pytest
 from backend.agent.errors import AgentExecutionError
 from backend.agent.extractors.invoice_extractor import InvoiceExtractor
 from backend.schemas import Factura
+from test_repair_invoice_parser import REPAIR_INVOICE_TEXT
 
 
 SOURCE = (
@@ -46,6 +47,11 @@ class FakeClient:
         return response_model.model_validate(self.data)
 
 
+class UnexpectedClient:
+    def chat(self, messages, response_model):
+        raise AssertionError("Ollama must not be called for the supported repair invoice layout")
+
+
 def extract(data, text=SOURCE):
     client = FakeClient(data)
     return InvoiceExtractor(client).extract(text)
@@ -66,6 +72,15 @@ def test_extract_returns_strict_invoice_with_decimal_price():
     assert invoice.items[0].cantidad == 2
     assert invoice.items[0].precio_unitario == Decimal("450.00")
     assert client.response_model is not None
+
+
+def test_supported_repair_invoice_skips_model_extraction():
+    invoice = InvoiceExtractor(UnexpectedClient()).extract(REPAIR_INVOICE_TEXT)
+
+    assert invoice.numero == "FAC-DEMO-002"
+    assert invoice.siniestro_id == "CLM-2026-002"
+    assert len(invoice.items) == 5
+    assert invoice.items[3].cantidad == 4
 
 
 @pytest.mark.parametrize(

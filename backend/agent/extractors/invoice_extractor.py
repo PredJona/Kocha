@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, ValidationEr
 from backend.agent.errors import AgentExecutionError
 from backend.agent.ollama_client import ChatClient
 from backend.agent.schemas import AgentRequest, ChatMessage
+from backend.agent.extractors.repair_invoice_parser import parse_repair_invoice_text
 from backend.schemas import Factura
 
 
@@ -96,9 +97,14 @@ class InvoiceExtractor:
         self.client = client
 
     def extract(self, text: str) -> Factura:
-        candidate = self.client.chat(
-            [ChatMessage(role="system", content=_SYSTEM_PROMPT), ChatMessage(role="user", content=text)],
-            CandidateInvoice,
+        parsed = parse_repair_invoice_text(text)
+        candidate = (
+            CandidateInvoice.model_validate(parsed)
+            if parsed is not None
+            else self.client.chat(
+                [ChatMessage(role="system", content=_SYSTEM_PROMPT), ChatMessage(role="user", content=text)],
+                CandidateInvoice,
+            )
         )
         data = candidate.model_dump()
         missing = _missing_required_fields(candidate)
