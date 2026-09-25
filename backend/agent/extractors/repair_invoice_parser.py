@@ -50,7 +50,12 @@ def parse_repair_invoice_text(text: str) -> dict[str, object] | None:
     )
     siniestro_id = _value_after(lines, {"reclamo", "siniestro", "claim"})
     detail_index = keys.index("detalle de reparacion")
-    subtotal_index = keys.index("subtotal", detail_index)
+    subtotal_index = next(
+        (index for index in range(detail_index + 1, len(keys)) if keys[index] == "subtotal"),
+        None,
+    )
+    if subtotal_index is None:
+        return None
     taller = lines[0] if detail_index > 0 else None
 
     items: list[dict[str, object]] = []

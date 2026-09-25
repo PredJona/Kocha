@@ -93,3 +93,19 @@ def test_unsupported_invoice_layout_returns_none():
     from backend.agent.extractors.repair_invoice_parser import parse_repair_invoice_text
 
     assert parse_repair_invoice_text(SHIPPING_INVOICE_TEXT) is None
+
+
+def test_subtotal_before_the_repair_table_falls_back_instead_of_crashing():
+    from backend.agent.extractors.repair_invoice_parser import parse_repair_invoice_text
+
+    text = """Subtotal
+B/. 0.00
+Detalle de reparacion
+Codigo
+Descripcion
+Cant.
+Precio unit.
+Total
+"""
+
+    assert parse_repair_invoice_text(text) is None
