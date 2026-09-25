@@ -4,7 +4,7 @@ import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
-from pydantic import BaseModel, ConfigDict, StrictInt, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, ValidationError
 
 from backend.agent.errors import AgentExecutionError
 from backend.agent.ollama_client import ChatClient
@@ -17,8 +17,8 @@ class CandidateItem(BaseModel):
 
     codigo: str | None = None
     descripcion: str | None = None
-    cantidad: StrictInt | None = None
-    precio_unitario: Decimal | None = None
+    cantidad: StrictInt | StrictFloat | str | None = None
+    precio_unitario: StrictInt | StrictFloat | str | None = None
 
 
 class CandidateInvoice(BaseModel):
@@ -34,7 +34,7 @@ _SYSTEM_PROMPT = (
     "Extrae los datos de la factura del texto. Copia solo valores presentes; "
     "usa null para campos ausentes. No hagas suposiciones ni audites la factura."
 )
-_NUMBER_TOKEN = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?![\w.,])")
+_NUMBER_TOKEN = re.compile(r"(?<![\w.,+-])\d+(?:[.,]\d+)*(?![\w.,])")
 
 
 def _normalized(value: str) -> str:

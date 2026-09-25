@@ -114,6 +114,40 @@ def test_invented_mandatory_values_are_unverified(data):
     assert "FAC-999" not in raised.value.message
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        SOURCE.replace("2 450,00", "-2 450,00"),
+        SOURCE.replace("2 450,00", "2 -450,00"),
+        SOURCE.replace("2 450,00", "450,00").replace("FAC-001", "FAC-002").replace("SIN-001", "SIN-002"),
+    ],
+)
+def test_negative_numbers_or_id_digits_do_not_verify_positive_values(text):
+    data = {**VALID, "numero": "FAC-002", "siniestro_id": "SIN-002"} if "FAC-002" in text else VALID
+
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data, text)
+
+    assert raised.value.code == "INVOICE_UNVERIFIED"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("cantidad", 2.5),
+        ("cantidad", "2"),
+        ("precio_unitario", "abc"),
+    ],
+)
+def test_semantically_invalid_model_values_are_invoice_invalid(field, value):
+    data = {**VALID, "items": [{**VALID["items"][0], field: value}]}
+
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data)
+
+    assert raised.value.code == "INVOICE_INVALID"
+
+
 def test_model_error_propagates_without_exposing_source():
     failure = AgentExecutionError("MODEL_UNAVAILABLE", "No se pudo contactar al modelo.")
 
