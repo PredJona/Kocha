@@ -132,6 +132,29 @@ def test_negative_numbers_or_id_digits_do_not_verify_positive_values(text):
 
 
 @pytest.mark.parametrize(
+    "text",
+    [
+        SOURCE.replace("2 450,00", "−2 450,00"),
+        SOURCE.replace("2 450,00", "450,00").replace("FAC-001", "FAC/002").replace("SIN-001", "SIN/002"),
+    ],
+)
+def test_unicode_minus_or_slash_id_cannot_verify_quantity(text):
+    data = {**VALID, "numero": "FAC/002", "siniestro_id": "SIN/002"} if "FAC/002" in text else VALID
+
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data, text)
+
+    assert raised.value.code == "INVOICE_UNVERIFIED"
+
+
+def test_whitespace_delimited_numbers_verify_valid_invoice():
+    invoice = extract(VALID, SOURCE)
+
+    assert invoice.items[0].cantidad == 2
+    assert invoice.items[0].precio_unitario == Decimal("450.00")
+
+
+@pytest.mark.parametrize(
     "field,value",
     [
         ("cantidad", 2.5),
