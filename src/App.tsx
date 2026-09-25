@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { AuditReport } from './components/AuditReport'
 import { Icon } from './components/Icon'
-import { auditInvoice, getClaim, saveInvoice } from './services/api'
+import { runClaimGuardAgent } from './services/api'
 import type { AuditResponse, Invoice } from './types/audit'
 
 type ChatMessage = { role: 'agent' | 'user' | 'activity'; text: string; detail?: string }
@@ -31,16 +31,13 @@ export default function App() {
     if (!prompt.trim() || isWorking) return
     setError(null); setReport(null); setIsWorking(true)
     addMessage({ role: 'user', text: prompt })
-    addMessage({ role: 'activity', text: 'Verificando el siniestro', detail: `Consulta segura: get_claim(${invoice.siniestro_id})` })
     try {
-      const claim = await getClaim(invoice.siniestro_id)
-      setClaimDetail(`${claim.id} · ${claim.placa} · ${claim.descripcion_dano}`)
-      addMessage({ role: 'activity', text: 'Siniestro confirmado', detail: `${claim.items_autorizados.length} conceptos autorizados encontrados.` })
-      addMessage({ role: 'activity', text: 'Contrastando tarifas y conceptos', detail: 'El motor de reglas analiza el documento sin tomar decisiones de pago.' })
-      await saveInvoice(invoice).catch((reason: Error) => { if (!reason.message.includes('ya fue registrada')) throw reason })
-      const result = await auditInvoice(invoice)
-      setReport(result)
-      addMessage({ role: 'agent', text: result.estado === 'CORRECTA' ? 'Terminé la revisión: no encontré observaciones relevantes.' : `Terminé la revisión: encontré ${result.cantidad_inconsistencias} hallazgo${result.cantidad_inconsistencias === 1 ? '' : 's'} para que lo revises.`, detail: 'El informe conserva la evidencia disponible y requiere validación humana.' })
+      const result = await runClaimGuardAgent({ prompt, invoice })
+      for (const step of result.steps) addMessage({ role: 'activity', text: step.message, detail: [step.tool, step.status].filter(Boolean).join(' · ') })
+      if (result.claim) setClaimDetail(`${result.claim.id} · ${result.claim.placa} · ${result.claim.descripcion_dano}`)
+      setReport(result.audit)
+      addMessage({ role: 'agent', text: result.message })
+      if (result.status === 'failed') setError(result.error?.message ?? result.message)
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo completar la auditoría.'
       setError(message); addMessage({ role: 'agent', text: 'No pude terminar esa revisión.', detail: message })
