@@ -34,7 +34,7 @@ _SYSTEM_PROMPT = (
     "Extrae los datos de la factura del texto. Copia solo valores presentes; "
     "usa null para campos ausentes. No hagas suposiciones ni audites la factura."
 )
-_NUMBER_TOKEN = re.compile(r"(?<![\w.,+-])\d+(?:[.,]\d+)*(?![\w.,])")
+_NUMBER_TOKEN = re.compile(r"(?<!\S)[0-9]+(?:[.,][0-9]+)?(?!\S)")
 
 
 def _normalized(value: str) -> str:
@@ -45,8 +45,6 @@ def _source_numbers(text: str) -> set[Decimal]:
     numbers: set[Decimal] = set()
     for match in _NUMBER_TOKEN.finditer(text):
         token = match.group()
-        if token.count(".") + token.count(",") > 1:
-            continue
         try:
             numbers.add(Decimal(token.replace(",", ".")))
         except InvalidOperation:

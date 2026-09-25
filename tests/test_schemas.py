@@ -154,7 +154,7 @@ def test_agent_step_accepts_each_status(status):
     assert step.status == status
 
 
-@pytest.mark.parametrize("step_type", ["invoice_validated", "model_call", "tool_call", "response_generated", "error"])
+@pytest.mark.parametrize("step_type", ["pdf_text_extracted", "invoice_extracted", "invoice_validated", "model_call", "tool_call", "response_generated", "error"])
 def test_agent_step_accepts_each_type(step_type):
     step = AgentStep(type=step_type, status="completed", message="Hecho")
 
