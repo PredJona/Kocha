@@ -1,6 +1,7 @@
 """Bounded orchestration loop for ClaimGuard's structured tool decisions."""
 
 import logging
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -14,6 +15,7 @@ from backend.agent.schemas import (
     AgentRequest,
     AgentResponse,
     AgentStep,
+    ChatMessage,
     FinalDecision,
     ToolCall,
     ToolDecision,
@@ -25,6 +27,17 @@ from backend.agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 MAX_TOOL_STEPS = 5
+_AUDIT_REQUEST_RE = re.compile(
+    r"\b(?:audita(?:r)?|auditor[ií]as?|audit(?:s|ed|ing)?|"
+    r"revis(?:a|ar|e|i[oó]n)|review(?:s|ed|ing)?|"
+    r"comprueba|comprobar|compruebe|check(?:s|ed|ing)?)\b",
+    re.IGNORECASE,
+)
+_AUDIT_REMINDER = (
+    "La solicitud requiere una auditoría. Llama a audit_invoice con la factura original "
+    "incluida en la solicitud, espera el resultado y después responde."
+)
+_AUDIT_NOT_PERFORMED = "No se pudo completar la auditoría solicitada."
 
 
 class AgentOrchestrator:
@@ -46,6 +59,8 @@ class AgentOrchestrator:
         try:
             messages = initial_messages(request, self.registry.describe())
             tool_steps = 0
+            audit_required = _AUDIT_REQUEST_RE.search(request.prompt) is not None
+            audit_reminded = False
 
             while True:
                 model_step = AgentStep(
@@ -55,7 +70,10 @@ class AgentOrchestrator:
                 )
                 steps.append(model_step)
                 try:
-                    decision_response = self.client.chat(messages, AgentDecision)
+                    response_model = (
+                        ToolDecision if audit_required and audit is None else AgentDecision
+                    )
+                    decision_response = self.client.chat(messages, response_model)
                 except Exception:
                     steps[-1] = model_step.model_copy(update={"status": "failed"})
                     raise
@@ -63,8 +81,25 @@ class AgentOrchestrator:
                     update={"status": "completed", "message": "El modelo respondió."}
                 )
 
-                decision = decision_response.root
+                decision = (
+                    decision_response.root
+                    if isinstance(decision_response, AgentDecision)
+                    else decision_response
+                )
                 if isinstance(decision, FinalDecision):
+                    if audit_required and audit is None:
+                        if not audit_reminded:
+                            messages.append(ChatMessage(role="user", content=_AUDIT_REMINDER))
+                            audit_reminded = True
+                            continue
+                        return self._failed(
+                            "audit_not_performed",
+                            _AUDIT_NOT_PERFORMED,
+                            steps,
+                            tool_results,
+                            claim,
+                            audit,
+                        )
                     steps.append(
                         AgentStep(
                             type="response_generated",
@@ -133,6 +168,15 @@ class AgentOrchestrator:
                     elif result.tool == "audit_invoice":
                         audit = result.output
                 messages.extend(tool_messages(decision, result))
+                if (
+                    audit_required
+                    and audit is None
+                    and result.tool == "audit_invoice"
+                    and result.status == "error"
+                    and not audit_reminded
+                ):
+                    messages.append(ChatMessage(role="user", content=_AUDIT_REMINDER))
+                    audit_reminded = True
 
         except AgentExecutionError as exc:
             return self._failed(exc.code, exc.message, steps, tool_results, claim, audit)
