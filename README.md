@@ -74,11 +74,11 @@ Las pruebas automatizadas y CI sustituyen únicamente el límite externo de Olla
 ## Flujo disponible hoy
 
 1. Selecciona el siniestro sintético `SIN-001`.
-2. Ingresa o importa una factura JSON estructurada.
+2. Usa la factura JSON de ejemplo o adjunta una factura JSON o PDF con texto seleccionable.
 3. Ejecuta la auditoría y revisa cargos duplicados, conceptos fuera del
    siniestro y precios superiores a la tarifa.
 
-La interfaz React sigue usando facturas JSON; no incluye carga de PDF. El contrato `/api/v1/audits` aún no está implementado.
+La interfaz envía JSON a `/api/agent` y PDF como multipart (`file` y `prompt`) a `/api/agent/pdf`. Muestra la trazabilidad y el informe de auditoría devueltos por el backend. Los PDF escaneados sin texto seleccionable no son compatibles. El contrato `/api/v1/audits` aún no está implementado.
 
 ## Git para el equipo
 
