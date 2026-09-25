@@ -77,6 +77,21 @@ def crear_tablas():
                 "REP-002",
                 "Faro delantero",
                 18000
+            ),
+            (
+                "MAT-001",
+                "Pintura y materiales",
+                15000
+            ),
+            (
+                "MO-001",
+                "Mano de obra - carrocería",
+                5000
+            ),
+            (
+                "MO-002",
+                "Mano de obra - pintura",
+                5000
             )
         ])
 
@@ -138,6 +153,33 @@ def crear_tablas():
                 "SIN-001",
                 "MAN-001"
             )
+        ])
+
+        cursor.execute("""
+            INSERT OR IGNORE INTO siniestros (
+                id,
+                placa,
+                descripcion_dano
+            )
+            VALUES (?, ?, ?)
+        """, (
+            "CLM-2026-002",
+            "AB1234",
+            "Reparación por colisión frontal"
+        ))
+
+        cursor.executemany("""
+            INSERT OR IGNORE INTO items_siniestro (
+                siniestro_id,
+                codigo_item
+            )
+            VALUES (?, ?)
+        """, [
+            ("CLM-2026-002", "REP-001"),
+            ("CLM-2026-002", "REP-002"),
+            ("CLM-2026-002", "MAT-001"),
+            ("CLM-2026-002", "MO-001"),
+            ("CLM-2026-002", "MO-002"),
         ])
 
 

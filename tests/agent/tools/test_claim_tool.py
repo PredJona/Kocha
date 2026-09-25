@@ -20,6 +20,23 @@ def test_get_claim_returns_database_claim_and_authorized_items(temporary_databas
     }
 
 
+def test_get_claim_returns_fac_demo_claim_and_authorized_items(temporary_database):
+    registry = ToolRegistry()
+    registry.register(claim_tool())
+
+    result = registry.execute(
+        ToolCall(call_id="claim-demo", name="get_claim", arguments={"claim_id": "CLM-2026-002"})
+    )
+
+    assert result.status == "success"
+    assert result.output == {
+        "id": "CLM-2026-002",
+        "placa": "AB1234",
+        "descripcion_dano": "Reparación por colisión frontal",
+        "items_autorizados": ["MAT-001", "MO-001", "MO-002", "REP-001", "REP-002"],
+    }
+
+
 def test_missing_claim_is_a_safe_registry_failure(temporary_database):
     registry = ToolRegistry()
     registry.register(claim_tool())

@@ -42,6 +42,28 @@ def test_audit_invoice_reports_over_tariff_item(temporary_database, invoice_data
     assert result.output["inconsistencias"][0]["tipo"] == "PRECIO_SUPERA_TARIFA"
 
 
+def test_fac_demo_invoice_reports_only_two_over_tariff_items(temporary_database):
+    invoice = {
+        "numero": "FAC-DEMO-002",
+        "siniestro_id": "CLM-2026-002",
+        "taller": "Taller Automotriz Panama, S.A.",
+        "items": [
+            {"codigo": "REP-001", "descripcion": "Parachoques delantero", "cantidad": 1, "precio_unitario": "450.00"},
+            {"codigo": "REP-002", "descripcion": "Faro delantero derecho", "cantidad": 1, "precio_unitario": "185.00"},
+            {"codigo": "MAT-001", "descripcion": "Pintura y materiales", "cantidad": 1, "precio_unitario": "120.00"},
+            {"codigo": "MO-001", "descripcion": "Mano de obra - carroceria", "cantidad": 4, "precio_unitario": "35.00"},
+            {"codigo": "MO-002", "descripcion": "Mano de obra - pintura", "cantidad": 3, "precio_unitario": "30.00"},
+        ],
+    }
+
+    result = _audit(temporary_database, invoice)
+
+    assert result.status == "success"
+    assert result.output["cantidad_inconsistencias"] == 2
+    assert [finding["codigo"] for finding in result.output["inconsistencias"]] == ["REP-001", "REP-002"]
+    assert all(finding["tipo"] == "PRECIO_SUPERA_TARIFA" for finding in result.output["inconsistencias"])
+
+
 def test_audit_invoice_reports_item_unauthorized_for_claim(temporary_database, invoice_data):
     invoice_data["items"][0]["codigo"] = "REP-002"
 
