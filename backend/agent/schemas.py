@@ -90,7 +90,7 @@ class AgentError(StrictContract):
 
 
 class AgentStep(StrictContract):
-    type: Literal["invoice_validated", "model_call", "tool_call", "response_generated", "error"]
+    type: Literal["pdf_text_extracted", "invoice_extracted", "invoice_validated", "model_call", "tool_call", "response_generated", "error"]
     tool: str | None = None
     status: Literal["running", "completed", "failed"]
     message: str

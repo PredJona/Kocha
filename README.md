@@ -28,7 +28,7 @@ npm run build
 npm test
 ```
 
-## Agente local (factura JSON)
+## Agente local (factura JSON o PDF con texto)
 
 Instala Python 3.12, [Ollama](https://docs.ollama.com/quickstart) y Node.js 22. Desde la raíz del repositorio:
 
@@ -53,6 +53,14 @@ En otra terminal, ejecuta `npm run dev` para usar la interfaz. También puedes p
 curl -sS http://127.0.0.1:8000/agent -H 'Content-Type: application/json' -d '{"prompt":"Audita esta factura","invoice":{"numero":"FAC-DEMO-001","siniestro_id":"SIN-001","taller":"Taller de prueba","items":[{"codigo":"REP-001","descripcion":"Parachoques delantero","cantidad":1,"precio_unitario":450}]}}'
 ```
 
+Para una factura PDF pequeña que contenga texto seleccionable:
+
+```bash
+curl -F file=@invoice.pdf -F 'prompt=Audita esta factura' http://127.0.0.1:8000/agent/pdf
+```
+
+`/agent/pdf` acepta PDFs de hasta 5 MiB y 20 páginas, extrae como máximo 30 000 caracteres, valida los campos obtenidos y ejecuta la misma auditoría del agente JSON. Requiere texto incrustado: no hace OCR de imágenes o escaneos. Los errores de lectura y extracción devuelven un resultado controlado sin ejecutar la auditoría.
+
 La respuesta incluye la explicación, los resultados obtenidos y una lista de pasos ejecutados por el backend. El agente presenta hallazgos para revisión humana; no aprueba pagos ni declara fraude.
 
 ```bash
@@ -61,7 +69,7 @@ npm test
 npm run build
 ```
 
-Las pruebas automatizadas sustituyen únicamente el límite externo de Ollama por respuestas controladas; no requieren un servidor ni modelo local. El `curl` anterior es una **prueba de integración local con Ollama real**, independiente de CI. Si Ollama no responde, comprueba que esté iniciado, que `OLLAMA_MODEL` coincida con `ollama list` y que `OLLAMA_HOST` apunte al servidor correcto. Para cambiar de modelo basta con instalarlo mediante `ollama pull <nombre>` y ajustar `OLLAMA_MODEL`.
+Las pruebas automatizadas y CI sustituyen únicamente el límite externo de Ollama por respuestas controladas; usan extracción PDF, SQLite y reglas de auditoría reales sin requerir servidor ni modelo local. Los `curl` anteriores son **pruebas opcionales de integración local con Ollama real**, independientes de CI. Si Ollama no responde, comprueba que esté iniciado, que `OLLAMA_MODEL` coincida con `ollama list` y que `OLLAMA_HOST` apunte al servidor correcto. Para cambiar de modelo basta con instalarlo mediante `ollama pull <nombre>` y ajustar `OLLAMA_MODEL`.
 
 ## Flujo disponible hoy
 
@@ -70,7 +78,7 @@ Las pruebas automatizadas sustituyen únicamente el límite externo de Ollama po
 3. Ejecuta la auditoría y revisa cargos duplicados, conceptos fuera del
    siniestro y precios superiores a la tarifa.
 
-La carga de PDF y el contrato `/api/v1/audits` aún no están implementados.
+La interfaz React sigue usando facturas JSON; no incluye carga de PDF. El contrato `/api/v1/audits` aún no está implementado.
 
 ## Git para el equipo
 

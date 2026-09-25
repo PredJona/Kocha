@@ -39,7 +39,7 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
             length = 0
             for page in reader.pages:
                 contents = page.get_contents()
-                if contents is not None and len(contents.get_data()) > MAX_PAGE_CONTENT_BYTES:
+                if contents is not None and hasattr(contents, "get_data") and len(contents.get_data()) > MAX_PAGE_CONTENT_BYTES:
                     raise AgentExecutionError("PDF_TOO_LARGE", "El contenido del PDF es demasiado grande.")
                 part = page.extract_text() or ""
                 length += len(part) + (1 if parts else 0)
