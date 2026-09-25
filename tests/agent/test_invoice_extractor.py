@@ -1,0 +1,124 @@
+from decimal import Decimal
+
+import pytest
+
+from backend.agent.errors import AgentExecutionError
+from backend.agent.extractors.invoice_extractor import InvoiceExtractor
+from backend.schemas import Factura
+
+
+SOURCE = (
+    "Factura FAC-001\nSiniestro SIN-001\nTaller Taller Norte\n"
+    "REP-001 Parachoques delantero 2 450,00\n"
+)
+VALID = {
+    "numero": "FAC-001",
+    "siniestro_id": "SIN-001",
+    "taller": "Taller Norte",
+    "items": [
+        {
+            "codigo": "REP-001",
+            "descripcion": "Parachoques delantero",
+            "cantidad": 2,
+            "precio_unitario": "450.00",
+        }
+    ],
+}
+
+
+class FakeClient:
+    def __init__(self, data=None, error=None):
+        self.data = data
+        self.error = error
+        self.response_model = None
+
+    def chat(self, messages, response_model):
+        self.response_model = response_model
+        if self.error:
+            raise self.error
+        return response_model.model_validate(self.data)
+
+
+def extract(data, text=SOURCE):
+    client = FakeClient(data)
+    return InvoiceExtractor(client).extract(text)
+
+
+def test_extract_returns_strict_invoice_with_decimal_price():
+    client = FakeClient(VALID)
+
+    invoice = InvoiceExtractor(client).extract(SOURCE.lower())
+
+    assert isinstance(invoice, Factura)
+    assert invoice.numero == "FAC-001"
+    assert invoice.siniestro_id == "SIN-001"
+    assert invoice.taller == "Taller Norte"
+    assert len(invoice.items) == 1
+    assert invoice.items[0].codigo == "REP-001"
+    assert invoice.items[0].descripcion == "Parachoques delantero"
+    assert invoice.items[0].cantidad == 2
+    assert invoice.items[0].precio_unitario == Decimal("450.00")
+    assert client.response_model is not None
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {**VALID, "numero": None},
+        {**VALID, "taller": "  "},
+        {**VALID, "items": None},
+        {**VALID, "items": []},
+        {**VALID, "items": [{**VALID["items"][0], "codigo": None}]},
+        {**VALID, "items": [{**VALID["items"][0], "precio_unitario": None}]},
+    ],
+)
+def test_missing_essential_fields_are_incomplete(data):
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data)
+
+    assert raised.value.code == "INVOICE_INCOMPLETE"
+    assert "FAC-001" not in raised.value.message
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("cantidad", 0),
+        ("cantidad", -1),
+        ("precio_unitario", "0"),
+        ("precio_unitario", "-1"),
+    ],
+)
+def test_nonpositive_item_numbers_are_invalid(field, value):
+    data = {**VALID, "items": [{**VALID["items"][0], field: value}]}
+
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data)
+
+    assert raised.value.code == "INVOICE_INVALID"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {**VALID, "numero": "FAC-999"},
+        {**VALID, "items": [{**VALID["items"][0], "precio_unitario": "451.00"}]},
+        {**VALID, "items": [{**VALID["items"][0], "cantidad": 3}]},
+    ],
+)
+def test_invented_mandatory_values_are_unverified(data):
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data)
+
+    assert raised.value.code == "INVOICE_UNVERIFIED"
+    assert "FAC-999" not in raised.value.message
+
+
+def test_model_error_propagates_without_exposing_source():
+    failure = AgentExecutionError("MODEL_UNAVAILABLE", "No se pudo contactar al modelo.")
+
+    with pytest.raises(AgentExecutionError) as raised:
+        InvoiceExtractor(FakeClient(error=failure)).extract(SOURCE)
+
+    assert raised.value is failure
+    assert SOURCE not in raised.value.message
