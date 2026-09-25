@@ -5,8 +5,9 @@ const apiUrl = (path: string) => `/api${path}`
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(apiUrl(path), { headers: { 'Content-Type': 'application/json', ...init?.headers }, ...init })
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { detail?: string } | null
-    throw new Error(body?.detail ?? 'No pudimos comunicarnos con el servidor.')
+    const body = await response.json().catch(() => null) as { detail?: unknown } | null
+    const detail = typeof body?.detail === 'string' && body.detail.trim() ? body.detail : null
+    throw new Error(detail ?? (response.status === 422 ? 'La factura o solicitud no es válida.' : 'No pudimos comunicarnos con el servidor.'))
   }
   return response.json() as Promise<T>
 }

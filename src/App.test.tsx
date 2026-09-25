@@ -60,4 +60,14 @@ describe('ClaimGuard UI', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Siniestro confirmado')).toBeNull()
   })
+
+  it('explica una factura inválida devuelta por el backend', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => ({ detail: [{ loc: ['body', 'invoice'], msg: 'Invalid input' }] }) }))
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Enviar/i }))
+
+    await waitFor(() => expect(screen.getAllByText('La factura o solicitud no es válida.').length).toBeGreaterThan(0))
+    expect(screen.queryByText('Siniestro confirmado')).toBeNull()
+  })
 })
