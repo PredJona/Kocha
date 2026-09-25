@@ -1,7 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { AuditReport } from './components/AuditReport'
 import { Icon } from './components/Icon'
-import { InvoiceEvidence } from './components/InvoiceEvidence'
 import { consultedSources, ProcessTrace } from './components/ProcessTrace'
 import { runClaimGuardAgent, runClaimGuardPdfAgent } from './services/api'
 import type { AgentResponse, Invoice } from './types/audit'
@@ -53,8 +52,8 @@ export default function App() {
         : await runClaimGuardAgent({ prompt, invoice: extractedPdfInvoice ?? invoice! })
       if (pdfFile && response.invoice) setExtractedPdfInvoice(response.invoice)
       setResult(response)
-      const errorDetail = response.error?.message !== response.message ? response.error?.message : undefined
-      addMessage({ role: 'agent', text: response.message, detail: errorDetail })
+      addMessage({ role: 'agent', text: response.message })
+      if (response.status === 'failed') setError(response.error?.message ?? response.message)
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo completar la auditoría.'
       setError(message); addMessage({ role: 'agent', text: 'No pude terminar esa revisión.', detail: message })
@@ -84,12 +83,13 @@ export default function App() {
         </article>)}
         {isWorking && <div className="working-status" role="status"><span className="working-pulse" /> Analizando factura...</div>}
         {report && <AuditReport report={report} onReset={reset} />}
-        {result?.invoice && <InvoiceEvidence invoice={result.invoice} />}
         {result && <ProcessTrace result={result} />}
       </div>
       <form className="composer" onSubmit={runAgent}>
         <input ref={fileInput} type="file" aria-label="Adjuntar factura JSON o PDF" accept="application/json,application/pdf,.json,.pdf" onChange={(event) => event.target.files?.[0] && attachFile(event.target.files[0])} />
         {pdfFile || invoice ? <div className="attachment-chip"><Icon name="file" size={18} /><div><strong>{pdfFile ? pdfFile.name : invoice?.numero}</strong><small>{pdfFile ? `${fileSize(pdfFile.size)} · PDF` : `${invoice?.items.length} conceptos · JSON`}</small></div><button type="button" onClick={() => { setInvoice(null); setPdfFile(null); setExtractedPdfInvoice(null); setError(null); setResult(null) }} aria-label="Quitar factura adjunta">×</button></div> : <p className="empty-attachment">Adjunta una factura JSON o PDF para comenzar.</p>}
+
+
         <div className="composer-row"><button type="button" className="attach-button" onClick={() => fileInput.current?.click()} aria-label="Seleccionar factura JSON o PDF"><Icon name="upload" size={19} /></button><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Pregunta sobre este caso..." rows={1} aria-label="Pregunta sobre este caso" /><button className="send-button" disabled={isWorking || !prompt.trim() || (!pdfFile && !invoice)} type="submit" aria-label="Enviar"><Icon name="arrow" size={18} /></button></div>
       </form>
       {error && <p className="chat-error" role="alert"><Icon name="alert" size={16} />{error}</p>}

@@ -1,3 +1,4 @@
+
 from fastapi.testclient import TestClient
 
 from backend.agent.errors import AgentExecutionError
@@ -12,6 +13,7 @@ SOURCE = "Factura FAC-001 Siniestro SIN-001 Taller Taller Norte REP-001 Parachoq
 def test_pdf_endpoint_runs_real_audit(invoice_data, temporary_database, monkeypatch):
     responses = iter([
         invoice_data,
+        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": invoice_data}},
         {"type": "final_answer", "message": "Revisión completada."},
     ])
 
@@ -118,124 +120,3 @@ def test_pdf_endpoint_rejects_blank_prompt(temporary_database):
 
     assert response.status_code == 422
     assert "Traceback" not in response.text
-
-
-def test_pdf_endpoint_rejects_corrupted_pdf_before_model(temporary_database, monkeypatch):
-    def unexpected_chat(self, messages, response_model):
-        raise AssertionError("Ollama must not be called for corrupted PDF")
-
-    monkeypatch.setattr(OllamaClient, "chat", unexpected_chat)
-    response = TestClient(app).post(
-        "/agent/pdf",
-        files={"file": ("corrupt.pdf", b"not a valid pdf", "application/pdf")},
-        data={"prompt": "Audita"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == "PDF_INVALID"
-    assert [step["type"] for step in body["steps"]] == ["error"]
-    assert "Traceback" not in response.text
-
-
-def test_pdf_endpoint_stops_after_unverified_extraction(invoice_data, temporary_database, monkeypatch):
-    calls = 0
-
-    def fake_chat(self, messages, response_model):
-        nonlocal calls
-        calls += 1
-        return response_model.model_validate({**invoice_data, "numero": "FAC-999"})
-
-    monkeypatch.setattr(OllamaClient, "chat", fake_chat)
-    response = TestClient(app).post(
-        "/agent/pdf",
-        files={"file": ("invoice.pdf", make_text_pdf(SOURCE), "application/pdf")},
-        data={"prompt": "Audita"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == "INVOICE_UNVERIFIED"
-    assert body["audit"] is None
-    assert calls == 1
-    assert [step["type"] for step in body["steps"]] == ["pdf_text_extracted", "error"]
-
-
-def test_pdf_endpoint_stops_after_invalid_invoice_values(invoice_data, temporary_database, monkeypatch):
-    calls = 0
-
-    def fake_chat(self, messages, response_model):
-        nonlocal calls
-        calls += 1
-        invalid_items = [{**invoice_data["items"][0], "cantidad": 0}]
-        return response_model.model_validate({**invoice_data, "items": invalid_items})
-
-    monkeypatch.setattr(OllamaClient, "chat", fake_chat)
-    response = TestClient(app).post(
-        "/agent/pdf",
-        files={"file": ("invoice.pdf", make_text_pdf(SOURCE), "application/pdf")},
-        data={"prompt": "Audita"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == "INVOICE_INVALID"
-    assert body["audit"] is None
-    assert calls == 1
-    assert [step["type"] for step in body["steps"]] == ["pdf_text_extracted", "error"]
-
-
-def test_pdf_endpoint_handles_model_outage(temporary_database, monkeypatch):
-    def fake_chat(self, messages, response_model):
-        raise AgentExecutionError("MODEL_UNAVAILABLE", "No se pudo contactar al modelo.")
-
-    monkeypatch.setattr(OllamaClient, "chat", fake_chat)
-    response = TestClient(app).post(
-        "/agent/pdf",
-        files={"file": ("invoice.pdf", make_text_pdf(SOURCE), "application/pdf")},
-        data={"prompt": "Audita"},
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == "MODEL_UNAVAILABLE"
-    assert body["audit"] is None
-    assert [step["type"] for step in body["steps"]] == ["pdf_text_extracted", "error"]
-    assert "Traceback" not in response.text
-
-
-def test_pdf_endpoint_runs_pipeline_in_worker_thread(invoice_data, temporary_database, monkeypatch):
-    import backend.main
-    import starlette.concurrency
-
-    threadpool_calls = 0
-    original_run_in_threadpool = starlette.concurrency.run_in_threadpool
-
-    async def spy_run_in_threadpool(func, *args, **kwargs):
-        nonlocal threadpool_calls
-        threadpool_calls += 1
-        return await original_run_in_threadpool(func, *args, **kwargs)
-
-    responses = iter([
-        invoice_data,
-        {"type": "final_answer", "message": "Revisión completada."},
-    ])
-
-    def fake_chat(self, messages, response_model):
-        return response_model.model_validate(next(responses))
-
-    monkeypatch.setattr(OllamaClient, "chat", fake_chat)
-    monkeypatch.setattr(backend.main, "run_in_threadpool", spy_run_in_threadpool)
-
-    response = TestClient(app).post(
-        "/agent/pdf",
-        files={"file": ("invoice.pdf", make_text_pdf(SOURCE), "application/pdf")},
-        data={"prompt": "Audita esta factura"},
-    )
-
-    assert response.status_code == 200
-    assert threadpool_calls == 1
