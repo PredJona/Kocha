@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { AuditReport } from './components/AuditReport'
 import { Icon } from './components/Icon'
+import { InvoiceEvidence } from './components/InvoiceEvidence'
 import { consultedSources, ProcessTrace } from './components/ProcessTrace'
 import { runClaimGuardAgent, runClaimGuardPdfAgent } from './services/api'
 import type { AgentResponse, Invoice } from './types/audit'
@@ -52,8 +53,8 @@ export default function App() {
         : await runClaimGuardAgent({ prompt, invoice: extractedPdfInvoice ?? invoice! })
       if (pdfFile && response.invoice) setExtractedPdfInvoice(response.invoice)
       setResult(response)
-      addMessage({ role: 'agent', text: response.message })
-      if (response.status === 'failed') setError(response.error?.message ?? response.message)
+      const errorDetail = response.error?.message !== response.message ? response.error?.message : undefined
+      addMessage({ role: 'agent', text: response.message, detail: errorDetail })
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo completar la auditoría.'
       setError(message); addMessage({ role: 'agent', text: 'No pude terminar esa revisión.', detail: message })
@@ -83,6 +84,7 @@ export default function App() {
         </article>)}
         {isWorking && <div className="working-status" role="status"><span className="working-pulse" /> Analizando factura...</div>}
         {report && <AuditReport report={report} onReset={reset} />}
+        {result?.invoice && <InvoiceEvidence invoice={result.invoice} />}
         {result && <ProcessTrace result={result} />}
       </div>
       <form className="composer" onSubmit={runAgent}>

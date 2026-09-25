@@ -106,6 +106,29 @@ button:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px so
 .report-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:13px;border-top:1px solid #283749}
 .report-footer p{margin:0;max-width:70%;font-size:10px;line-height:1.5;color:#8b98aa}
 .report-footer button{background:none;border:0;color:#8fb7e8;font-size:11px;font-weight:700;white-space:nowrap}
+.invoice-evidence{width:100%;padding:15px 5px;border-top:1px solid #2a394b}
+.invoice-evidence-heading{display:flex;align-items:center;gap:10px}
+.invoice-evidence-heading strong,.invoice-evidence-heading small{display:block}
+.invoice-evidence-heading strong{font-size:12px;color:#e0e8f2}
+.invoice-evidence-heading small{margin-top:3px;font-size:10px;color:#8b98aa}
+.invoice-evidence-heading small span+span::before{content:' · '}
+.invoice-evidence-icon{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:8px;background:#182638;color:#8fb7e8}
+.invoice-evidence-details{margin:11px 0 0 40px}
+.invoice-evidence-details summary{display:flex;align-items:center;gap:6px;width:max-content;list-style:none;cursor:pointer;color:#8fb7e8;font-size:11px;font-weight:700}
+.invoice-evidence-details summary::-webkit-details-marker{display:none}
+.invoice-evidence-details[open] summary svg{transform:rotate(90deg)}
+.invoice-evidence-details dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.invoice-evidence-details dl div{min-width:0}
+.invoice-evidence-details dt{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#718094}
+.invoice-evidence-details dd{margin:4px 0 0;font-size:11px;color:#d5e0ed;overflow-wrap:anywhere}
+.invoice-evidence-details ul{list-style:none;margin:0;padding:0;border-top:1px solid #263547}
+.invoice-evidence-details li{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #202d3d;font-size:11px}
+.invoice-evidence-details li>div:first-child{display:flex;align-items:baseline;gap:10px;min-width:0}
+.invoice-evidence-details code{flex:none;font:10px 'DM Mono',monospace;color:#9bb1cb}
+.invoice-evidence-details li span{color:#c8d3df;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.invoice-evidence-amount{display:flex;align-items:baseline;gap:5px;flex:none}
+.invoice-evidence-amount small{color:#718094}
+.invoice-evidence-amount strong{font:11px 'DM Mono',monospace;color:#e0e8f2}
 .process-trace{width:100%;display:grid;grid-template-columns:1fr auto;align-items:start;padding:12px 5px;border-top:1px solid #2a394b;column-gap:12px}
 .process-summary{display:flex;gap:10px;align-items:flex-start;color:#75c69e}
 .process-failed .process-summary{color:#e89ba0}

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -131,6 +131,47 @@ describe('ClaimGuard UI', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/agent/pdf')
     expect(fetchMock.mock.calls[1][0]).toBe('/api/agent')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ prompt: '¿Puedes decirme de qué se trata?', invoice: extractedInvoice })
+  })
+
+  it('muestra como evidencia los datos extraídos del PDF', async () => {
+    const extractedInvoice = {
+      numero: 'FAC-DEMO-002',
+      siniestro_id: 'CLM-2026-002',
+      taller: 'Taller Automotriz Panama, S.A.',
+      items: [
+        { codigo: 'REP-001', descripcion: 'Parachoques delantero', cantidad: 1, precio_unitario: 450 },
+        { codigo: 'MO-001', descripcion: 'Mano de obra - carroceria', cantidad: 4, precio_unitario: 35 },
+      ],
+    }
+    stubAgent({ ...agentResponse, invoice: extractedInvoice })
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Adjuntar factura JSON o PDF'), { target: { files: [new File(['%PDF-1.4'], 'FAC-DEMO-002.pdf', { type: 'application/pdf' })] } })
+
+    await submitInvoice()
+
+    const evidence = await screen.findByRole('region', { name: 'Evidencia de factura' })
+    expect(within(evidence).getByText('2 conceptos extraídos')).toBeTruthy()
+    fireEvent.click(within(evidence).getByText('Ver datos extraídos'))
+    expect(within(evidence).getByText('CLM-2026-002')).toBeTruthy()
+    expect(within(evidence).getByText('REP-001')).toBeTruthy()
+    expect(within(evidence).getByText('B/.450.00')).toBeTruthy()
+  })
+
+  it('no duplica un error controlado del backend en el composer', async () => {
+    stubAgent({
+      ...agentResponse,
+      status: 'failed',
+      message: 'No se pudieron extraer los campos obligatorios: conceptos.',
+      audit: null,
+      error: { code: 'INVOICE_INCOMPLETE', message: 'No se pudieron extraer los campos obligatorios: conceptos.' },
+      steps: [{ type: 'error', tool: null, status: 'failed', message: 'No se pudieron extraer los campos obligatorios: conceptos.' }],
+    })
+    render(<App />)
+
+    await submitInvoice()
+    await screen.findAllByText('No se pudieron extraer los campos obligatorios: conceptos.')
+
+    expect(document.querySelector('.chat-error')).toBeNull()
   })
 
   it('restaura el flujo JSON después de adjuntar un PDF', async () => {
