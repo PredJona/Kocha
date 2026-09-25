@@ -118,6 +118,7 @@ class AgentResponse(StrictContract):
     message: str
     steps: list[AgentStep] = Field(default_factory=list)
     tool_results: list[ToolResult] = Field(default_factory=list)
+    invoice: Factura | None = None
     claim: dict[str, Any] | None = None
     audit: dict[str, Any] | None = None
     error: AgentError | None = None

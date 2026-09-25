@@ -54,6 +54,7 @@ def test_direct_answer_has_only_actions_that_really_happened(invoice_data, tempo
 
     assert response.status == "completed"
     assert response.message == "La factura requiere revisión humana."
+    assert response.invoice.numero == "FAC-001"
     assert [step.type for step in response.steps] == [
         "invoice_validated", "model_call", "response_generated"
     ]

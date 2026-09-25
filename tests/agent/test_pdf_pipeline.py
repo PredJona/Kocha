@@ -41,6 +41,7 @@ def test_pdf_pipeline_audits_extracted_invoice(invoice_data, temporary_database)
     result = run(make_text_pdf(SOURCE), fake)
 
     assert result.status == "completed"
+    assert result.invoice.numero == "FAC-001"
     assert result.audit["estado"] == "CORRECTA"
     assert [step.type for step in result.steps] == [
         "pdf_text_extracted", "invoice_extracted", "invoice_validated", "model_call",
@@ -48,6 +49,24 @@ def test_pdf_pipeline_audits_extracted_invoice(invoice_data, temporary_database)
     ]
     assert all(step.status == "completed" for step in result.steps)
     assert fake.calls == 3
+
+
+def test_pdf_pipeline_detects_an_over_tariff_item(invoice_data, temporary_database):
+    over_tariff_invoice = {
+        **invoice_data,
+        "items": [{**invoice_data["items"][0], "precio_unitario": "450.00"}],
+    }
+    fake = FakeChat(
+        over_tariff_invoice,
+        {"type": "tool_call", "name": "audit_invoice", "arguments": {"invoice": over_tariff_invoice}},
+        {"type": "final_answer", "message": "Se detectó una posible inconsistencia tarifaria."},
+    )
+
+    result = run(make_text_pdf(SOURCE.replace("125.50", "450.00")), fake)
+
+    assert result.status == "completed"
+    assert result.audit["estado"] == "CON_INCONSISTENCIAS"
+    assert result.audit["inconsistencias"][0]["tipo"] == "PRECIO_SUPERA_TARIFA"
 
 
 def test_blank_pdf_fails_before_model_or_orchestrator(temporary_database):
@@ -84,6 +103,17 @@ def test_invalid_model_json_is_controlled(invoice_data, temporary_database):
     assert [step.type for step in result.steps] == ["pdf_text_extracted", "error"]
     assert result.audit is None
     assert fake.calls == 1
+
+
+def test_pdf_pipeline_preserves_a_model_timeout_as_a_distinct_failure(temporary_database):
+    fake = FakeChat(AgentExecutionError("MODEL_TIMEOUT", "Se agotó el tiempo de espera del modelo."))
+
+    result = run(make_text_pdf(SOURCE), fake)
+
+    assert result.status == "failed"
+    assert result.error.code == "MODEL_TIMEOUT"
+    assert result.message == "Se agotó el tiempo de espera del modelo."
+    assert [step.type for step in result.steps] == ["pdf_text_extracted", "error"]
 
 
 def test_unexpected_extraction_error_is_public_safe(temporary_database):

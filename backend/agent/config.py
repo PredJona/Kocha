@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 class AgentSettings:
     host: str = "http://127.0.0.1:11434"
     model: str = "qwen2.5:3b"
-    timeout: float = 30.0
+    timeout: float = 120.0
 
     def __post_init__(self) -> None:
         raw_host = self.host.strip()

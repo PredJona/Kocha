@@ -11,7 +11,7 @@ def test_settings_use_development_defaults(monkeypatch):
 
     assert settings.host == "http://127.0.0.1:11434"
     assert settings.model == "qwen2.5:3b"
-    assert settings.timeout == 30.0
+    assert settings.timeout == 120.0
 
 
 def test_settings_allow_model_and_connection_overrides(monkeypatch):

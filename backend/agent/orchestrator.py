@@ -23,6 +23,7 @@ from backend.agent.schemas import (
 )
 from backend.agent.tools.audit_tool import AuditInput
 from backend.agent.tools.registry import ToolRegistry
+from backend.schemas import Factura
 
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ class AgentOrchestrator:
                             _AUDIT_NOT_PERFORMED,
                             steps,
                             tool_results,
+                            request.invoice,
                             claim,
                             audit,
                         )
@@ -112,6 +114,7 @@ class AgentOrchestrator:
                         message=decision.message,
                         steps=steps,
                         tool_results=tool_results,
+                        invoice=request.invoice,
                         claim=claim,
                         audit=audit,
                     )
@@ -134,6 +137,7 @@ class AgentOrchestrator:
                         "Se alcanzó el límite de consultas a herramientas.",
                         steps,
                         tool_results,
+                        request.invoice,
                         claim,
                         audit,
                     )
@@ -179,7 +183,7 @@ class AgentOrchestrator:
                     audit_reminded = True
 
         except AgentExecutionError as exc:
-            return self._failed(exc.code, exc.message, steps, tool_results, claim, audit)
+            return self._failed(exc.code, exc.message, steps, tool_results, request.invoice, claim, audit)
         except Exception as exc:
             # Error messages and stack traces can include invoice/model data; log only a safe class label.
             logger.error("Unexpected agent orchestration failure error_class=%s", type(exc).__name__)
@@ -188,6 +192,7 @@ class AgentOrchestrator:
                 "Ocurrió un error interno al procesar la solicitud.",
                 steps,
                 tool_results,
+                request.invoice,
                 claim,
                 audit,
             )
@@ -217,6 +222,7 @@ class AgentOrchestrator:
         message: str,
         steps: list[AgentStep],
         tool_results: list[ToolResult],
+        invoice: Factura,
         claim: dict[str, Any] | None,
         audit: dict[str, Any] | None,
     ) -> AgentResponse:
@@ -226,6 +232,7 @@ class AgentOrchestrator:
             message=message,
             steps=steps,
             tool_results=tool_results,
+            invoice=invoice,
             claim=claim,
             audit=audit,
             error=AgentError(code=code, message=message),

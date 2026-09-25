@@ -112,6 +112,27 @@ describe('ClaimGuard UI', () => {
     expect(screen.queryByText('Siniestro confirmado')).toBeNull()
   })
 
+  it('reutiliza la factura extraída para una pregunta posterior sobre el PDF', async () => {
+    const extractedInvoice = { numero: 'FAC-DEMO-002', siniestro_id: 'SIN-001', taller: 'Taller Aurora', items: [{ codigo: 'REP-001', descripcion: 'Parachoques delantero', cantidad: 1, precio_unitario: 450 }] }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...agentResponse, invoice: extractedInvoice }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...agentResponse, message: 'Es una factura de reparación de parachoques.', audit: null, invoice: extractedInvoice }) })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+    fireEvent.change(screen.getByLabelText('Adjuntar factura JSON o PDF'), { target: { files: [new File(['%PDF-1.4'], 'FAC-DEMO-002.pdf', { type: 'application/pdf' })] } })
+
+    await submitInvoice()
+    await screen.findByText('Revisión lista para una persona.')
+    fireEvent.change(screen.getByLabelText('Pregunta sobre este caso'), { target: { value: '¿Puedes decirme de qué se trata?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    await screen.findByText('Es una factura de reparación de parachoques.')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/agent/pdf')
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/agent')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ prompt: '¿Puedes decirme de qué se trata?', invoice: extractedInvoice })
+  })
+
   it('restaura el flujo JSON después de adjuntar un PDF', async () => {
     const fetchMock = stubAgent(agentResponse)
     render(<App />)

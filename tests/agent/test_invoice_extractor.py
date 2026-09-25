@@ -11,6 +11,13 @@ SOURCE = (
     "Factura FAC-001\nSiniestro SIN-001\nTaller Taller Norte\n"
     "REP-001 Parachoques delantero 2 450,00\n"
 )
+DEMO_SOURCE = (
+    "FACTURA N.º: FAC-DEMO-002\n"
+    "N.º DE SINIESTRO: SIN-001\n"
+    "TALLER: Taller Aurora\n"
+    "CÓDIGO | DESCRIPCIÓN | CANTIDAD | PRECIO UNITARIO\n"
+    "REP-001 | Parachoques delantero | 1 | B/.450.00\n"
+)
 VALID = {
     "numero": "FAC-001",
     "siniestro_id": "SIN-001",
@@ -20,7 +27,7 @@ VALID = {
             "codigo": "REP-001",
             "descripcion": "Parachoques delantero",
             "cantidad": 2,
-            "precio_unitario": "450.00",
+            "precio_unitario": "B/.450.00",
         }
     ],
 }
@@ -78,6 +85,37 @@ def test_missing_essential_fields_are_incomplete(data):
 
     assert raised.value.code == "INVOICE_INCOMPLETE"
     assert "FAC-001" not in raised.value.message
+
+
+def test_incomplete_invoice_identifies_the_missing_required_fields():
+    data = {**VALID, "siniestro_id": None, "items": [{**VALID["items"][0], "precio_unitario": None}]}
+
+    with pytest.raises(AgentExecutionError) as raised:
+        extract(data)
+
+    assert raised.value.code == "INVOICE_INCOMPLETE"
+    assert raised.value.message == (
+        "No se pudieron extraer los campos obligatorios: siniestro, concepto 1: precio unitario."
+    )
+
+
+def test_demo_invoice_layout_accepts_currency_prefixed_price():
+    data = {
+        "numero": "FAC-DEMO-002",
+        "siniestro_id": "SIN-001",
+        "taller": "Taller Aurora",
+        "items": [{
+            "codigo": "REP-001",
+            "descripcion": "Parachoques delantero",
+            "cantidad": 1,
+            "precio_unitario": "450.00",
+        }],
+    }
+
+    invoice = extract(data, DEMO_SOURCE)
+
+    assert invoice.numero == "FAC-DEMO-002"
+    assert invoice.items[0].precio_unitario == Decimal("450.00")
 
 
 @pytest.mark.parametrize(

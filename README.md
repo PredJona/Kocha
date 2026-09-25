@@ -43,7 +43,7 @@ Inicia Ollama con `ollama serve` si aún no está ejecutándose. Instala un mode
 ```bash
 export OLLAMA_HOST=http://127.0.0.1:11434
 export OLLAMA_MODEL=qwen2.5:3b
-export OLLAMA_TIMEOUT=30
+export OLLAMA_TIMEOUT=120
 .venv/bin/uvicorn backend.main:app --reload
 ```
 
