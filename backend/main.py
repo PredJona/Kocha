@@ -1,16 +1,18 @@
 import sqlite3
-from decimal import Decimal
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import Depends, FastAPI, HTTPException
 
 from backend.auditoria import auditar_factura
+from backend.agent.factory import get_agent_orchestrator
+from backend.agent.orchestrator import AgentOrchestrator
+from backend.agent.schemas import AgentRequest, AgentResponse
 from backend.database import (
     crear_tablas,
     guardar_factura,
     listar_tarifas,
     obtener_siniestro,
 )
+from backend.schemas import Factura, ItemFactura
 
 
 app = FastAPI(
@@ -20,24 +22,6 @@ app = FastAPI(
 
 
 crear_tablas()
-
-
-class ItemFactura(BaseModel):
-    codigo: str
-    descripcion: str
-    cantidad: int = Field(
-        gt=0
-    )
-    precio_unitario: Decimal = Field(
-        gt=0
-    )
-
-
-class Factura(BaseModel):
-    numero: str
-    siniestro_id: str
-    taller: str
-    items: list[ItemFactura]
 
 
 @app.get("/")
@@ -123,3 +107,11 @@ def auditar(
         ),
         "inconsistencias": inconsistencias
     }
+
+
+@app.post("/agent", response_model=AgentResponse)
+def ejecutar_agente(
+    request: AgentRequest,
+    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
+) -> AgentResponse:
+    return orchestrator.run(request)
