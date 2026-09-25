@@ -60,9 +60,24 @@ def test_rejects_more_than_twenty_pages() -> None:
     assert_pdf_error(make_pdf_pages(["page"] * 21), "PDF_TOO_MANY_PAGES")
 
 
+def test_accepts_twenty_pages() -> None:
+    assert extract_pdf_text(make_pdf_pages(["page"] * 20)) == "\n".join(["page"] * 20)
+
+
 def test_rejects_more_than_thirty_thousand_extracted_characters() -> None:
     assert_pdf_error(make_text_pdf("A" * 30_001), "PDF_TEXT_TOO_LONG")
 
 
+def test_accepts_thirty_thousand_extracted_characters() -> None:
+    assert extract_pdf_text(make_text_pdf("A" * 30_000)) == "A" * 30_000
+
+
 def test_counts_page_separators_toward_text_limit() -> None:
     assert_pdf_error(make_pdf_pages(["A" * 15_000, "B" * 15_000]), "PDF_TEXT_TOO_LONG")
+
+
+def test_rejects_small_compressed_pdf_with_oversized_page_content() -> None:
+    pdf = make_pdf_pages(["invoice"], compressed_padding=1024 * 1024)
+    assert len(pdf) < 5 * 1024 * 1024
+
+    assert_pdf_error(pdf, "PDF_TOO_LARGE")

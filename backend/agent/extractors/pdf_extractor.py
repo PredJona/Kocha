@@ -2,7 +2,8 @@
 
 from io import BytesIO
 
-from pypdf import PdfReader
+from pypdf import PdfReader, apply_configuration
+from pypdf.errors import LimitReachedError
 
 from backend.agent.errors import AgentExecutionError
 
@@ -10,6 +11,7 @@ from backend.agent.errors import AgentExecutionError
 MAX_PDF_BYTES = 5 * 1024 * 1024
 MAX_PAGES = 20
 MAX_TEXT_CHARACTERS = 30_000
+MAX_PAGE_CONTENT_BYTES = 1024 * 1024
 
 
 def extract_pdf_text(pdf_bytes: bytes) -> str:
@@ -20,22 +22,34 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         raise AgentExecutionError("PDF_TOO_LARGE", "El PDF supera el tamaño permitido.")
 
     try:
-        reader = PdfReader(BytesIO(pdf_bytes), strict=True)
-        if reader.is_encrypted:
-            raise AgentExecutionError("PDF_ENCRYPTED", "El PDF está cifrado.")
-        if len(reader.pages) > MAX_PAGES:
-            raise AgentExecutionError("PDF_TOO_MANY_PAGES", "El PDF tiene demasiadas páginas.")
+        with apply_configuration(
+            maximum_declared_stream_length=MAX_PAGE_CONTENT_BYTES,
+            array_based_stream_maximum_output_length=MAX_PAGE_CONTENT_BYTES,
+            zlib_maximum_output_length=MAX_PAGE_CONTENT_BYTES,
+            lzw_maximum_output_length=MAX_PAGE_CONTENT_BYTES,
+            run_length_maximum_output_length=MAX_PAGE_CONTENT_BYTES,
+        ):
+            reader = PdfReader(BytesIO(pdf_bytes), strict=True)
+            if reader.is_encrypted:
+                raise AgentExecutionError("PDF_ENCRYPTED", "El PDF está cifrado.")
+            if len(reader.pages) > MAX_PAGES:
+                raise AgentExecutionError("PDF_TOO_MANY_PAGES", "El PDF tiene demasiadas páginas.")
 
-        parts = []
-        length = 0
-        for page in reader.pages:
-            part = page.extract_text() or ""
-            length += len(part) + (1 if parts else 0)
-            if length > MAX_TEXT_CHARACTERS:
-                raise AgentExecutionError("PDF_TEXT_TOO_LONG", "El texto del PDF es demasiado largo.")
-            parts.append(part)
+            parts = []
+            length = 0
+            for page in reader.pages:
+                contents = page.get_contents()
+                if contents is not None and len(contents.get_data()) > MAX_PAGE_CONTENT_BYTES:
+                    raise AgentExecutionError("PDF_TOO_LARGE", "El contenido del PDF es demasiado grande.")
+                part = page.extract_text() or ""
+                length += len(part) + (1 if parts else 0)
+                if length > MAX_TEXT_CHARACTERS:
+                    raise AgentExecutionError("PDF_TEXT_TOO_LONG", "El texto del PDF es demasiado largo.")
+                parts.append(part)
     except AgentExecutionError:
         raise
+    except LimitReachedError as exc:
+        raise AgentExecutionError("PDF_TOO_LARGE", "El contenido del PDF es demasiado grande.") from exc
     except Exception as exc:
         raise AgentExecutionError("PDF_INVALID", "El archivo no es un PDF válido.") from exc
 
