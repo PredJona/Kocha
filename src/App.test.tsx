@@ -41,6 +41,7 @@ describe('ClaimGuard UI', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith('/api/agent', expect.objectContaining({ method: 'POST' }))
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Content-Type')).toBe('application/json')
     expect(body.prompt).toBe('Audita la factura adjunta para el siniestro SIN-001')
     expect(body.invoice.numero).toBe('FAC-2026-001')
     expect(screen.getByText('Auditoría ejecutada')).toBeTruthy()
@@ -69,5 +70,34 @@ describe('ClaimGuard UI', () => {
 
     await waitFor(() => expect(screen.getAllByText('La factura o solicitud no es válida.').length).toBeGreaterThan(0))
     expect(screen.queryByText('Siniestro confirmado')).toBeNull()
+  })
+
+  it('envía un PDF mediante multipart al endpoint del agente PDF', async () => {
+    const fetchMock = stubAgent({ ...agentResponse, steps: [
+      { type: 'pdf_text_extracted', tool: null, status: 'completed', message: 'Texto del PDF extraído' },
+      { type: 'invoice_extracted', tool: null, status: 'completed', message: 'Factura extraída' },
+    ] })
+    render(<App />)
+    const file = new File(['%PDF-1.4'], 'factura-demo.pdf', { type: 'application/pdf' })
+    fireEvent.change(screen.getByLabelText('Adjuntar factura JSON o PDF'), { target: { files: [file] } })
+    fireEvent.click(screen.getByRole('button', { name: /Enviar/i }))
+    await screen.findByText('Factura extraída')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/agent/pdf')
+    expect(init.body).toBeInstanceOf(FormData)
+    expect(init.body.get('file')).toBe(file)
+    expect(init.body.get('prompt')).toBe('Audita la factura adjunta para el siniestro SIN-001')
+    expect(new Headers(init.headers).has('Content-Type')).toBe(false)
+  })
+
+  it('muestra un paso fallido sin icono de éxito', async () => {
+    stubAgent({ ...agentResponse, status: 'failed', audit: null, error: { code: 'PDF_NO_TEXT', message: 'El PDF no contiene texto extraíble.' }, steps: [{ type: 'error', tool: null, status: 'failed', message: 'No se extrajo texto' }] })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Enviar/i }))
+    await screen.findByText('No se extrajo texto')
+    const event = screen.getByText('No se extrajo texto').closest('.tool-event')!
+    expect(event.classList.contains('tool-event-failed')).toBe(true)
+    expect(screen.getByText('El PDF no contiene texto extraíble.')).toBeTruthy()
   })
 })
