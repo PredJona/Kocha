@@ -53,7 +53,10 @@ export default function App() {
       if (pdfFile && response.invoice) setExtractedPdfInvoice(response.invoice)
       setResult(response)
       addMessage({ role: 'agent', text: response.message })
-      if (response.status === 'failed') setError(response.error?.message ?? response.message)
+      if (response.status === 'failed') {
+        const controlledError = response.error?.message ?? response.message
+        if (controlledError.trim() !== response.message.trim()) setError(controlledError)
+      }
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'No se pudo completar la auditoría.'
       setError(message); addMessage({ role: 'agent', text: 'No pude terminar esa revisión.', detail: message })
